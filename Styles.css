@@ -1,0 +1,16 @@
+```css
+body {
+    background-color: #020617;
+    color: #f8fafc;
+    font-family: 'Heebo', sans-serif;
+}
+.glass-panel {
+    background: rgba(30, 41, 59, 0.5);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+}
+.text-glow {
+    text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+```
