@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <title>Chronomicra | פתרון התעלומה הכרונולוגית | Chronological Validator</title>
+    <meta name="title" content="Chronomicra | פתרון התעלומה הכרונולוגית | Chronological Validator">
+    <meta name="description" content="מערכת אימות נתונים כרונולוגית הממירה ענני הסתברות של תארוך פחמן-14 אל רשת מתמטית אבסולוטית (JDN) המסונכרנת עם נתונים אסטרונומיים. | Absolute chronological validation system.">
+    
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://www.chronomicra.com/">
+    <meta property="og:title" content="Chronomicra | The Chronological Validator">
+    <meta property="og:description" content="מערכת אימות נתונים כרונולוגית הממירה ענני הסתברות של פחמן-14 אל רשת מתמטית אבסולוטית.">
+    <meta property="og:image" content="YOUR_IMAGE_URL_HERE.jpg">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Heebo:wght@300;400;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap');
+        
+        body { background-color: #020617; color: #e2e8f0; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        .font-he { font-family: 'Heebo', sans-serif; }
+        .font-en { font-family: 'Inter', sans-serif; }
+        .font-mono-sci { font-family: 'Share Tech Mono', monospace; }
+        .font-title { font-family: 'Rajdhani', sans-serif; }
+        
+        .glow-text-cyan { text-shadow: 0 0 10px rgba(6, 182, 212, 0.7); }
+        .glow-box-cyan { box-shadow: 0 0 20px rgba(6, 182, 212, 0.15), inset 0 0 20px rgba(6, 182, 212, 0.05); }
+        .glow-text-emerald { text-shadow: 0 0 10px rgba(16, 185, 129, 0.7); color: #34d399; }
+        .glow-text-red { text-shadow: 0 0 10px rgba(244, 63, 94, 0.7); }
+        
+        .bg-grid-subtle { background-size: 50px 50px; background-image: linear-gradient(to right, rgba(6, 182, 212, 0.03) 1px, transparent 1px), linear-gradient(to bottom, rgba(6, 182, 212, 0.03) 1px, transparent 1px); }
+        .bg-grid-active { background-size: 50px 50px; background-image: linear-gradient(to right, rgba(6, 182, 212, 0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(6, 182, 212, 0.08) 1px, transparent 1px); opacity: 0; transition: opacity 1.5s ease-in-out; }
+        .bg-grid-active.active { opacity: 1; }
+
+        .particle { transition: all 2.5s cubic-bezier(0.25, 1, 0.5, 1); }
+        .sample-row { transition: all 0.5s ease-in-out; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .ring-circle { fill: none; stroke-linecap: round; transition: stroke-dashoffset 1.5s cubic-bezier(0.16, 1, 0.3, 1); }
+
+        .eclipse-container { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 140px; height: 140px; z-index: 5; opacity: 0; transition: opacity 0.5s ease; pointer-events: none; }
+        .sync-state-animating_sync .eclipse-container, .sync-state-synced .eclipse-container, .sync-state-animating_unsync .eclipse-container { opacity: 1; }
+        .eclipse-sun { position: absolute; inset: 20px; border-radius: 50%; background: #cffafe; box-shadow: 0 0 40px #06b6d4, 0 0 80px rgba(6, 182, 212, 0.5); transition: box-shadow 2.5s ease; }
+        .eclipse-moon { position: absolute; inset: 18px; border-radius: 50%; background: #01030a; transform: translateX(-120%); transition: transform 2.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sync-state-animating_sync .eclipse-moon, .sync-state-synced .eclipse-moon { transform: translateX(0%); }
+        .sync-state-animating_unsync .eclipse-moon { transform: translateX(120%); transition: transform 1.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .sync-state-unsynced .eclipse-moon { transform: translateX(-120%); transition: none; }
+        .sync-state-synced .eclipse-sun { box-shadow: 0 0 50px #06b6d4, 0 0 100px rgba(6, 182, 212, 0.8), inset 0 0 20px #fff; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        const ANCHOR_YEAR_BCE = -1406; 
+        const getJDN = (date) => Math.floor((date.getTime() / 86400000) + 2440587.5);
+        const calculateCycles = (currentDate) => {
+            const currentYear = currentDate.getFullYear();
+            const elapsedYears = currentYear - (ANCHOR_YEAR_BCE + 1) - 1; 
+            const currentJubileeCycle = Math.floor(elapsedYears / 50) + 1;
+            const yearInJubilee = (elapsedYears % 50) + 1;
+            const shmitaYear = ((yearInJubilee - 1) % 7) + 1;
+            const jdn = getJDN(currentDate);
+            const modulo100 = jdn % 100;
+            const coursesHe = ["יהויריב", "ידעיה", "חרים", "שעורים", "מלכיה", "מימין", "הקוץ", "אביה", "ישוע", "שכניה", "אלישיב", "יקים", "חופה", "ישבאב", "בלגה", "אמר", "חזיר", "הפצץ", "פתחיה", "יחזקאל", "יכין", "גמול", "דליה", "מעזיה"];
+            const coursesEn = ["Jehoiarib", "Jedaiah", "Harim", "Seorim", "Malchijah", "Mijamin", "Hakkoz", "Abijah", "Jeshua", "Shecaniah", "Eliashib", "Jakim", "Huppah", "Jeshebeab", "Bilgah", "Immer", "Hezir", "Happizzez", "Pethahiah", "Jehezkel", "Jachin", "Gamul", "Delaiah", "Maaziah"];
+            const courseIndex = Math.floor((jdn % 168) / 7);
+            return { currentJubileeCycle, yearInJubilee, shmitaYear, jdn, modulo100, courseHe: coursesHe[courseIndex], courseEn: coursesEn[courseIndex] };
+        };
+
+        const translations = {
+            en: {
+                nav: { model: "The Model", simulator: "Matrix", researchers: "Archeologin", portal: "Field App" },
+                hero: { badge: "The Vaiman Master Chronological Matrix", title1: "Decoupling History From", title2: "Statistical Myths", desc: "A unified absolute timeline built upon Bayesian astronomical synchronization, resolving the radiocarbon plateaus of the Southern Levant." },
+                clock: { title: "Live Temporal Sync", subtitle: "Translating today's date into the ancient administrative grid", course: "Priestly Course", jubilee: "Jubilee Cycle", shmita: "Sabbatical Year", yearInJub: "Year in Jubilee", jdnNow: "CURRENT JDN" },
+                triad: {
+                    title: "The Discovery Triad", subtitle: "How three distinct systems converge to form the absolute chronological bedrock.",
+                    astro: "Astronomy (Bedrock Anchors)", astroDesc: "Multi-site solar eclipses (Ugarit, Bur-Sagale, Thales) synchronized via NASA catalogs. These provide mathematically unquestionable coordinates on the Julian Day Number (JDN) timeline.",
+                    c14: "Carbon-14 (C14 Noise Cloud)", c14Desc: "Archaeological samples processed via calibration curves (IntCal20). The flat plateaus of 14C production historically created wide statistical envelopes and academic controversies.",
+                    text: "Biblical Texts (The Key Grid)", textDesc: "The core breakthrough. Reconstruction of the ancient administrative 100-day cycle (the 7² + 1 fractal). This mathematical framework aligns the probabilistic carbon clouds exactly with the celestial anchors."
+                },
+                sim: { 
+                    demo: "Interactive Bayesian Sandbox", title: "The Master Alignment Matrix", desc: "Select a chronological phase from the OxCal analysis below. Watch how the unmodelled probability cloud collapses into the absolute mathematical grid.", 
+                    statusMyth: "STATUS: UNMODELLED MYTH", statusMythSub: "C14 SCATTER ENVELOPE", statusFact: "STATUS: MODELLED FACT", statusFactSub: "CHRONOMICRA TEMPORAL LOCK", 
+                    statusCalc: "STATUS: REALIGNING ORBITS", statusCalcSub: "LOCATING CELESTIAL ALIGNMENT", statusUnsync: "STATUS: RELEASING MATRIX", statusUnsyncSub: "REVERTING TO STANDARD PROBABILITY",
+                    mythLabel: "Unmodelled Stratigraphy (Conventional C14 Range)", factLabel: "Modelled Vaiman Horizon (Absolute Bayesian Lock)", 
+                    btnSync: "Execute Temporal Lock", btnCalc: "Calculating Totality...", btnReset: "Release Temporal Lock", btnUnsyncing: "Decoupling Orbit...",
+                    anchorLabel: "Astronomical Anchor: ", aIndexLabel: "Agreement Index (A_model): ",
+                    tableTitle: "Bayesian Sample Breakdown", colSample: "Sample ID", colUnmodelled: "Unmodelled (Raw)", colModelled: "Modelled (Absolute)", colAgreement: "Agreement"
+                },
+                footer: { desc: "Chronological data validation system backed by advanced research.", about: "About the Model", contact: "Contact Us", archeologin: "ארכיאולוגין - Archeologin" }
+            },
+            he: {
+                nav: { model: "המודל", simulator: "מטריצה", researchers: "ארכיאולוגין", portal: "אפליקציית שטח" },
+                hero: { badge: "מטריצת הזמן הכרונולוגית של מודל ויימן", title1: "לנתק את ההיסטוריה", title2: "ממיתוסים סטטיסטיים", desc: "מערכת תיארוך אבסולוטית מאוחדת המבוססת על סנכרון בייסיאני אסטרונומי, הפותרת את פלטו הכיול של פחמן-14 בדרום לבנט." },
+                clock: { title: "סנכרון זמן חי", subtitle: "ממיר את תאריך היום אל הרשת האדמיניסטרטיבית העתיקה", course: "משמרת כהונה", jubilee: "מחזור יובל", shmita: "שנת שמיטה", yearInJub: "שנה ביובל", jdnNow: "JDN נוכחי" },
+                triad: {
+                    title: "משולש התגלית", subtitle: "כיצד שלוש מערכות נתונים שונות מתלכדות לכרונולוגיה מוחלטת אחת.",
+                    astro: "אסטרונומיה (עוגני ברזל)", astroDesc: "ליקויי חמה היסטוריים המוצלבים מול קטלוגי נאס\"א (אוגרית, בור-סגלה, תאלס). אירועים אלו מספקים קואורדינטות שמימיות מוחלטות שאינן ניתנות לוויכוח (JDN).",
+                    c14: "פחמן-14 (רעש סטטיסטי)", c14Desc: "דגימות חומריות מהחפירות המכוילות מול עקומות פחמן (IntCal20). פלטו הכיול השטוחים מייצרים טווחי זמן רחבים המקשים על שיוך שושלות ומלכים.",
+                    text: "הטקסט המקראי (רשת הנעילה)", textDesc: "לב פריצת הדרך. שחזור המערך האדמיניסטרטיבי המחזורי של 100 הימים (פרקטל 7²+1). רשת זו פועלת כמפתח המדויק הנועל את ענני הפחמן אל העוגנים האסטרונומיים."
+                },
+                sim: { 
+                    demo: "סימולטור בייסיאני אינטראקטיבי", title: "מטריצת הסנכרון המרכזית", desc: "בחר פאזה כרונולוגית מתוך מודל ה-OxCal מטה. צפה כיצד ענן ההסתברות הלא-מכויל קורס אל תוך רשת הזמן המוחלטת.", 
+                    statusMyth: "STATUS: UNMODELLED MYTH", statusMythSub: "C14 SCATTER ENVELOPE", statusFact: "STATUS: MODELLED FACT", statusFactSub: "CHRONOMICRA TEMPORAL LOCK", 
+                    statusCalc: "STATUS: REALIGNING ORBITS", statusCalcSub: "LOCATING CELESTIAL ALIGNMENT", statusUnsync: "STATUS: RELEASING MATRIX", statusUnsyncSub: "REVERTING TO STANDARD PROBABILITY",
+                    mythLabel: "סטרטיגרפיה לא-מכוילת (טווח פחמן-14 גולמי)", factLabel: "אופק ויימן מכויל (נעילה בייסיאנית אבסולוטית)", 
+                    btnSync: "בצע נעילה כרונולוגית", btnCalc: "מחשב נקודת סינכרון...", btnReset: "שחרר נעילה כרונולוגית", btnUnsyncing: "מנתק מסלול...",
+                    anchorLabel: "עוגן אסטרונומי: ", aIndexLabel: "מדד הסכמה בייסיאני (A_model): ",
+                    tableTitle: "פירוט הדגימות (OxCal Bayesian Breakdown)", colSample: "קוד דגימה", colUnmodelled: "טווח לא מכויל", colModelled: "טווח מבוסס מודל ויימן", colAgreement: "אינדקס הסכמה"
+                },
+                footer: { desc: "מערכת אימות נתונים כרונולוגית בחסות מחקר מתקדם.", about: "אודות המודל", contact: "צור קשר", archeologin: "ארכיאולוגין - Archeologin" }
+            }
+        };
+
+        const timelineDB = [
+            { 
+                id: 1, aIndex: "96.9", anchor: "Genesis Chrono-Matrix Sync",
+                en: { name: 'Patriarchal Baseline', interval: '2188 - 1705 BCE', mythRange: '2200 - 1600 BCE (Wide archaeological envelope)', factRange: '2188 - 1705 BCE (Strict Bayesian Boundary)' },
+                he: { name: 'תקופת האבות (כניסה לכנען)', interval: '2188 - 1705 לפנה"ס', mythRange: '2200 - 1600 לפנה"ס (טווח ארכיאולוגי מעורפל)', factRange: '2188 - 1705 לפנה"ס (גבול בייסיאני קשיח)' },
+                samples: [
+                    { id: "R_Date Tel Dan MB II", en: "Tel Dan Stratum XVI (Patriarchal Horizon)", unmodelled: "-1921 to -1688 BC", modelled: "-1888 to -1693 BC", aComb: "106.1%" },
+                    { id: "R_Date Avaris G/4", en: "Avaris Phase G/4 (Early Semitic)", unmodelled: "-1864 to -1548 BC", modelled: "-1738 to -1617 BC", aComb: "110.9%" },
+                    { id: "R_Date Avaris F", en: "Tell el-Daba Phase F (Josephite Admin)", unmodelled: "-1742 to -1544 BC", modelled: "-1736 to -1614 BC", aComb: "114.3%" }
+                ]
+            },
+            { 
+                id: 2, aIndex: "97.4", anchor: "Ugarit Solar Eclipse / JDN 1165200",
+                en: { name: 'Jericho Destruction (LB)', interval: '1609 - 1501 BCE', mythRange: '1627 - 1502 BCE (Conventional 14C range)', factRange: '1609 - 1501 BCE (Locked on Conquest Horizon)' },
+                he: { name: 'חורבן יריחו (תקופת הברונזה המאוחרת)', interval: '1609 - 1501 לפנה"ס', mythRange: '1627 - 1502 לפנה"ס (טווח פחמן-14 רחב במעבדות)', factRange: '1609 - 1501 לפנה"ס (נעילה על אופק הכבוש)' },
+                samples: [
+                    { id: "GrN-18731/2 (Weighted)", en: "Jericho City IV Destruction Horizon", unmodelled: "-1627 to -1502 BC", modelled: "-1609 to -1501 BC", aComb: "97.4%" }
+                ]
+            },
+            { 
+                id: 3, aIndex: "136.9", anchor: "Systemic Latency (Judges Era)",
+                en: { name: 'The Judges (Tribal Iron I)', interval: '1118 - 1023 BCE', mythRange: '1300 - 950 BCE (Wide Iron I cultural transition)', factRange: '1118 - 1023 BCE (Exits Hallstatt Plateau)' },
+                he: { name: 'תקופת השופטים ושילה (ברזל I)', interval: '1118 - 1023 לפנה"ס', mythRange: '1300 - 950 לפנה"ס (פער תרבותי כאוטי במחקר)', factRange: '1118 - 1023 לפנה"ס (יציאה מפלטו הכיול)' },
+                samples: [
+                    { id: "OxA-Shiloh-V-1", en: "Shiloh Sanctuary Layer V Destruction", unmodelled: "-1118 to -1025 BC", modelled: "-1118 to -1025 BC", aComb: "113.7%" },
+                    { id: "OxA-Ebal-Enclosure", en: "Mt. Ebal Cultic Altar Enclosure", unmodelled: "-1121 to -1023 BC", modelled: "-1121 to -1023 BC", aComb: "119.3%" }
+                ]
+            },
+            { 
+                id: 4, aIndex: "99.8", anchor: "Solomon Baseline / JDN 1352000",
+                en: { name: 'Solomon Temple Foundation', interval: '1098 - 967 BCE', mythRange: '1103 - 919 BCE (Traditional academic debate)', factRange: '1098 - 967 BCE (United Monarchy Coherence)' },
+                he: { name: 'בניין מקדש שלמה', interval: '1098 - 967 לפנה"ס', mythRange: '1103 - 919 לפנה"ס (מחלוקת אקדמית של עשרות שנים)', factRange: '1098 - 967 לפנה"ס (נעילה על אופק המלוכה המאוחדת)' },
+                samples: [
+                    { id: "Boundary Solomonic Foundation", en: "Solomonic Transition Horizon", unmodelled: "-1103 to -919 BC", modelled: "-1098 to -967 BC", aComb: "99.8%" },
+                    { id: "OxA-19304", en: "Khirbet Qeiyafa Olive Pit (Davidic Citadel)", unmodelled: "-1046 to -903 BC", modelled: "-1015 to -928 BC", aComb: "111.1%" },
+                    { id: "R_Date Hazor Stratum X", en: "Hazor Gatehouse Architectural Horizon", unmodelled: "-1008 to -834 BC", modelled: "-968 to -917 BC", aComb: "124.1%" }
+                ]
+            },
+            { 
+                id: 5, aIndex: "99.8", anchor: "Shishak Campaign (918 BCE) / JDN 1363500",
+                en: { name: 'The Divided Kingdom', interval: '921 - 851 BCE', mythRange: '975 - 811 BCE (C14 Plateau Distortion)', factRange: '921 - 851 BCE (Post-Solomonic Collapse)' },
+                he: { name: 'הממלכות המפוצלות ומסע שישק', interval: '921 - 851 לפנה"ס', mythRange: '975 - 811 לפנה"ס (עיוות פחמן-14 בפלטו הישן)', factRange: '921 - 851 לפנה"ס (חורבן פוסט-שלמה מאומת)' },
+                samples: [
+                    { id: "C_Date Shishak Anchor", en: "Egyptian Record Campaign (918 BCE)", unmodelled: "-921 to -917 BC", modelled: "-921 to -916 BC", aComb: "99.8%" },
+                    { id: "R_Date Tel Rehov Stratum V", en: "Rehov Apiary Destruction (Olive Pits)", unmodelled: "-975 to -822 BC", modelled: "-922 to -853 BC", aComb: "108.1%" },
+                    { id: "C_Date Assyrian Qarqar", en: "Battle of Qarqar (Ahab, 853 BCE)", unmodelled: "-856 to -852 BC", modelled: "-856 to -851 BC", aComb: "100.0%" }
+                ]
+            },
+            { 
+                id: 6, aIndex: "105.8", anchor: "Sennacherib Campaign (701 BCE) / JDN 1464900",
+                en: { name: 'Assyrian Conquest Horizon', interval: '791 - 590 BCE', mythRange: '792 - 567 BCE (Old Wood Effect & High Noise)', factRange: '701 BCE Pinpoint (Sennacherib Wall Lock)' },
+                he: { name: 'מסע סנחריב וחורבן לכיש (ברזל IIB)', interval: '791 - 590 לפנה"ס', mythRange: '792 - 567 לפנה"ס (עיוות עקב אפקט העץ הישן)', factRange: '701 לפנה"ס בדיוק (נעילת חומה אשורית)' },
+                samples: [
+                    { id: "C_Date Assyrian Anchor", en: "Assyrian Records Lock (701 BCE)", unmodelled: "-704 to -700 BC", modelled: "-704 to -699 BC", aComb: "99.9%" },
+                    { id: "R_Date Lachish III", en: "Lachish Layer III Destruction (Olive Pits)", unmodelled: "-792 to -567 BC", modelled: "-791 to -590 BC", aComb: "106.5%" }
+                ]
+            },
+            { 
+                id: 7, aIndex: "229.7", anchor: "Nebuchadnezzar II Siege (589 BCE) & Cyrus Edict",
+                en: { name: 'First Temple Fall & Return', interval: '753 - 397 BCE', mythRange: '600 - 400 BCE (Severe Hallstatt Plateau Flatline)', factRange: '589 BCE / 516 BCE (Pinpoint Temple Rebuild)' },
+                he: { name: 'חורבן בית ראשון ושיבת ציון', interval: '753 - 397 לפנה"ס', mythRange: '600 - 400 לפנה"ס (פלטו האלשטאט חריף ביותר)', factRange: '589 לפנה"ס / 516 לפנה"ס (בניית בית שני)' },
+                samples: [
+                    { id: "C_Date Babylonian Siege", en: "Babylonian Chronicle Anchor (589 BCE)", unmodelled: "-592 to -588 BC", modelled: "-592 to -587 BC", aComb: "100.0%" },
+                    { id: "OxA-CityOfDavid-E1", en: "City of David Destruction (Burnt House)", unmodelled: "-753 to -552 BC", modelled: "-753 to -552 BC", aComb: "109.9%" },
+                    { id: "OxA-NehemiahWall-D1", en: "Nehemiah Wall (High Plateau Impact)", unmodelled: "-422 to -397 BC", modelled: "-422 to -397 BC", aComb: "181.0%" }
+                ]
+            }
+        ];
+
+        class SoundEngine {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); }
+            playCharge() {
+                if(!this.ctx) return; const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.frequency.setValueAtTime(40, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 2.5);
+                gain.gain.setValueAtTime(0, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0.15, this.ctx.currentTime + 2.0); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 2.5);
+                osc.start(this.ctx.currentTime); osc.stop(this.ctx.currentTime + 2.5);
+            }
+            playLock() {
+                if(!this.ctx) return; const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'triangle'; osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.frequency.setValueAtTime(400, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(50, this.ctx.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+                osc.start(this.ctx.currentTime); osc.stop(this.ctx.currentTime + 0.3);
+            }
+            playUnsync() {
+                if(!this.ctx) return; const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+                osc.type = 'sine'; osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 1.5);
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime); gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.5);
+                osc.start(this.ctx.currentTime); osc.stop(this.ctx.currentTime + 1.5);
+            }
+        }
+        const audio = new SoundEngine();
+
+        // --- SUB-COMPONENTS ---
+        const LiveClock = ({ stats, lang, t }) => {
+            const size = 260; const center = size / 2; const strokeWidth = 4;
+            const rJub = 110; const cJub = 2 * Math.PI * rJub; const offJub = cJub - (stats.yearInJubilee / 50) * cJub;
+            const rShm = 85; const cShm = 2 * Math.PI * rShm; const offShm = cShm - (stats.shmitaYear / 7) * cShm;
+            const rMod = 60; const cMod = 2 * Math.PI * rMod; const offMod = cMod - (stats.modulo100 / 100) * cMod;
+
+            return (
+                <div className="w-full bg-slate-900/50 border-y border-cyan-900/30 py-12">
+                    <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-8">
+                        <div className="flex-1 text-center md:text-start">
+                            <div className="text-cyan-500 font-mono-sci text-xs font-bold tracking-widest mb-2 flex items-center gap-2 justify-center md:justify-start">
+                                <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></span> {t.clock.title}
+                            </div>
+                            <h2 className="text-3xl font-title font-bold text-white mb-2">{t.clock.subtitle}</h2>
+                            <p className="text-slate-400 mb-6">{t.clock.course}: <span className="text-cyan-400 font-bold ml-2">{lang === 'he' ? stats.courseHe : stats.courseEn}</span></p>
+                            
+                            <div className="flex gap-4 justify-center md:justify-start">
+                                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-center w-28 glow-box-cyan">
+                                    <div className="text-[10px] text-cyan-600 font-bold mb-1">{t.clock.jubilee}</div>
+                                    <div className="font-mono-sci text-2xl text-cyan-400">{stats.currentJubileeCycle}</div>
+                                </div>
+                                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-center w-28 shadow-[0_0_15px_rgba(139,92,246,0.1)]">
+                                    <div className="text-[10px] text-purple-500 font-bold mb-1">{t.clock.shmita}</div>
+                                    <div className="font-mono-sci text-2xl text-purple-400">{stats.shmitaYear}/7</div>
+                                </div>
+                                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-center w-28 glow-box-cyan">
+                                    <div className="text-[10px] text-cyan-600 font-bold mb-1">{t.clock.yearInJub}</div>
+                                    <div className="font-mono-sci text-2xl text-cyan-400">{stats.yearInJubilee}/50</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="relative flex justify-center items-center shrink-0">
+                            <svg width={size} height={size} className="transform -rotate-90 filter drop-shadow-[0_0_8px_rgba(6,182,212,0.3)]">
+                                <circle cx={center} cy={center} r={rJub} stroke="rgba(6,182,212,0.1)" strokeWidth={strokeWidth} fill="none" />
+                                <circle cx={center} cy={center} r={rJub} stroke="#06b6d4" strokeWidth={strokeWidth} className="ring-circle" strokeDasharray={cJub} strokeDashoffset={offJub} />
+                                <circle cx={center} cy={center} r={rShm} stroke="rgba(139,92,246,0.1)" strokeWidth={strokeWidth} fill="none" />
+                                <circle cx={center} cy={center} r={rShm} stroke="#8b5cf6" strokeWidth={strokeWidth} className="ring-circle" strokeDasharray={cShm} strokeDashoffset={offShm} />
+                                <circle cx={center} cy={center} r={rMod} stroke="rgba(56,189,248,0.1)" strokeWidth={strokeWidth} fill="none" />
+                                <circle cx={center} cy={center} r={rMod} stroke="#38bdf8" strokeWidth={strokeWidth} className="ring-circle" strokeDasharray={cMod} strokeDashoffset={offMod} />
+                            </svg>
+                            <div className="absolute flex flex-col items-center justify-center text-center">
+                                <span className="text-[9px] text-cyan-500/70 tracking-widest uppercase">{t.clock.jdnNow}</span>
+                                <span className="text-xl font-mono-sci glow-text-cyan font-bold mt-1">{stats.jdn}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const DiscoveryTriad = ({ t }) => {
+            return (
+                <section id="about" className="py-24 px-6 bg-[#040b16] border-b border-slate-800/50">
+                    <div className="max-w-6xl mx-auto">
+                        <div className="text-center mb-16">
+                            <h2 className="text-4xl font-title font-bold text-white mb-4">{t.triad.title}</h2>
+                            <p className="text-slate-400 max-w-2xl mx-auto text-lg">{t.triad.subtitle}</p>
+                        </div>
+                        
+                        <div className="grid lg:grid-cols-3 gap-8">
+                            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-cyan-500/50 transition-colors group">
+                                <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mb-6 group-hover:bg-cyan-900/50 transition-colors">
+                                    <i data-lucide="moon" className="w-7 h-7 text-slate-400 group-hover:text-cyan-400"></i>
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">{t.triad.astro}</h3>
+                                <p className="text-slate-400 text-sm leading-relaxed">{t.triad.astroDesc}</p>
+                            </div>
+                            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-rose-500/50 transition-colors group">
+                                <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mb-6 group-hover:bg-rose-900/50 transition-colors">
+                                    <i data-lucide="flask-conical" className="w-7 h-7 text-slate-400 group-hover:text-rose-400"></i>
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3">{t.triad.c14}</h3>
+                                <p className="text-slate-400 text-sm leading-relaxed">{t.triad.c14Desc}</p>
+                            </div>
+                            <div className="bg-slate-900/50 border border-slate-800 p-8 rounded-2xl hover:border-emerald-500/50 transition-colors group relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 blur-2xl rounded-full"></div>
+                                <div className="w-14 h-14 rounded-full bg-slate-800 flex items-center justify-center mb-6 group-hover:bg-emerald-900/50 transition-colors relative z-10">
+                                    <i data-lucide="book-open" className="w-7 h-7 text-slate-400 group-hover:text-emerald-400"></i>
+                                </div>
+                                <h3 className="text-xl font-bold text-white mb-3 relative z-10">{t.triad.text}</h3>
+                                <p className="text-slate-400 text-sm leading-relaxed relative z-10">{t.triad.textDesc}</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            );
+        };
+
+        const App = () => {
+            const [lang, setLang] = useState('he'); 
+            const [clockStats, setClockStats] = useState(null);
+            
+            useEffect(() => {
+                document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
+                document.documentElement.lang = lang;
+                lucide.createIcons();
+                setClockStats(calculateCycles(new Date()));
+                const timer = setInterval(() => setClockStats(calculateCycles(new Date())), 60000);
+                return () => clearInterval(timer);
+            }, [lang]);
+
+            const t = translations[lang];
+            const fontClass = lang === 'he' ? 'font-he' : 'font-en';
+
+            const [selectedEventId, setSelectedEventId] = useState(timelineDB[0].id);
+            const [syncState, setSyncState] = useState('unsynced');
+            
+            const selectedEvent = timelineDB.find(e => e.id === selectedEventId);
+            const eventContent = selectedEvent[lang];
+
+            const particles = useMemo(() => Array.from({ length: 50 }).map((_, i) => ({ id: i, startX: (Math.random() - 0.5) * 320, startY: (Math.random() - 0.5) * 180, delay: Math.random() * 0.5 })), [selectedEvent.id]);
+
+            const handleSync = () => {
+                audio.init(); 
+                if(syncState === 'synced') { setSyncState('animating_unsync'); audio.playUnsync(); setTimeout(() => setSyncState('unsynced'), 1500); return; }
+                if(syncState === 'unsynced') { setSyncState('animating_sync'); audio.playCharge(); setTimeout(() => { setSyncState('synced'); audio.playLock(); }, 2500); }
+            };
+
+            if (!clockStats) return null;
+
+            return (
+                <div className={`min-h-screen ${fontClass}`}>
+                    
+                    {/* NAVBAR */}
+                    <nav className="fixed w-full z-50 bg-[#020617]/80 backdrop-blur-md border-b border-cyan-900/30">
+                        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <i data-lucide="infinity" className="w-6 h-6 text-cyan-400"></i>
+                                <span className="font-title text-2xl font-bold tracking-[0.2em] text-white" dir="ltr">CHRONOMICRA</span>
+                            </div>
+                            <div className="hidden md:flex gap-6 text-sm font-semibold text-slate-400">
+                                <a href="#about" className="hover:text-cyan-400 transition-colors">{t.nav.model}</a>
+                                <a href="#simulator" className="hover:text-cyan-400 transition-colors">{t.nav.simulator}</a>
+                                <a href="archeologin.html" className="hover:text-cyan-400 transition-colors">{t.nav.researchers}</a>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setLang(l => l === 'he' ? 'en' : 'he')} className="flex items-center gap-2 bg-slate-800/80 hover:bg-slate-700 text-white px-3 py-1.5 rounded-md border border-slate-700 text-sm font-bold transition">
+                                    <span className="text-lg leading-none">{lang === 'he' ? '🇺🇸' : '🇮🇱'}</span>
+                                    <span>{lang === 'he' ? 'EN' : 'עברית'}</span>
+                                </button>
+                                <a href="archeologin.html" className="hidden sm:block bg-cyan-600/20 text-cyan-400 border border-cyan-500/50 px-4 py-1.5 rounded text-sm font-semibold hover:bg-cyan-600/40 transition">
+                                    {t.nav.portal}
+                                </a>
+                            </div>
+                        </div>
+                    </nav>
+
+                    {/* HERO */}
+                    <section className="relative pt-32 pb-16 px-6 bg-grid-subtle">
+                        <div className="max-w-4xl mx-auto text-center relative z-10">
+                            <div className="inline-block bg-cyan-950/50 border border-cyan-800/50 rounded-full px-4 py-1.5 mb-6">
+                                <span className="text-xs font-mono-sci text-cyan-400 font-bold uppercase tracking-widest">{t.hero.badge}</span>
+                            </div>
+                            <h1 className="text-5xl lg:text-7xl font-title font-bold text-white mb-6 leading-tight">
+                                {t.hero.title1} <br/>
+                                <span className="glow-text-cyan text-cyan-400">{t.hero.title2}</span>
+                            </h1>
+                            <p className="text-lg lg:text-xl text-slate-400 font-light mb-10 max-w-2xl mx-auto leading-relaxed">
+                                {t.hero.desc}
+                            </p>
+                        </div>
+                    </section>
+
+                    {/* CLOCK & TRIAD */}
+                    <LiveClock stats={clockStats} lang={lang} t={t} />
+                    <DiscoveryTriad t={t} />
+
+                    {/* SIMULATOR */}
+                    <section id="simulator" className="py-24 relative bg-[#020617] overflow-hidden">
+                        <div className={`absolute inset-0 bg-grid-active ${syncState === 'synced' ? 'active' : ''}`}></div>
+                        <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col items-center">
+                            
+                            <div className="text-center mb-10">
+                                <span className="text-cyan-500 font-mono-sci tracking-widest uppercase text-xs font-bold mb-2 block">{t.sim.demo}</span>
+                                <h2 className="text-4xl font-title font-bold text-white mb-4">{t.sim.title}</h2>
+                                <p className="text-slate-400 max-w-2xl">{t.sim.desc}</p>
+                            </div>
+
+                            <div className="w-full overflow-x-auto hide-scrollbar mb-10 pb-4">
+                                <div className="flex gap-4 min-w-max px-4">
+                                    {timelineDB.map(ev => (
+                                        <div key={ev.id} onClick={() => { if(syncState === 'unsynced') { setSelectedEventId(ev.id); } }}
+                                            className={`cursor-pointer w-64 p-4 rounded-xl border transition-all duration-300 flex flex-col ${selectedEvent.id === ev.id ? 'bg-cyan-900/40 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-slate-900/60 border-slate-800 hover:bg-slate-800'} ${syncState !== 'unsynced' ? 'opacity-50 pointer-events-none' : ''}`}>
+                                            <div className="text-xs font-mono-sci text-cyan-500 mb-2">{ev[lang].interval}</div>
+                                            <div className={`font-bold text-lg leading-tight ${selectedEvent.id === ev.id ? 'text-white' : 'text-slate-400'}`}>{ev[lang].name}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className={`w-full max-w-4xl h-80 bg-[#01030a] border border-slate-800 rounded-2xl relative flex flex-col justify-between p-6 mb-8 glow-box-cyan overflow-hidden sync-state-${syncState}`} dir="ltr">
+                                <div className="absolute top-0 bottom-0 left-1/2 w-px bg-cyan-900/50 -translate-x-1/2"></div>
+                                <div className="absolute top-1/2 left-1/2 w-6 h-6 -ml-3 -mt-3 rounded-full border border-cyan-800 z-10"></div>
+                                <div className="eclipse-container"><div className="eclipse-sun"></div><div className="eclipse-moon"></div></div>
+
+                                {particles.map(p => {
+                                    const isSynced = syncState === 'synced' || syncState === 'animating_sync';
+                                    const style = {
+                                        transform: isSynced && syncState === 'synced' ? `translate(0px, 0px) scale(0)` : `translate(${p.startX}px, ${p.startY}px) scale(${Math.random() * 0.5 + 0.5})`,
+                                        transitionDelay: isSynced && syncState === 'synced' ? `${p.delay}s` : '0s', transitionDuration: syncState === 'animating_unsync' ? '1.5s' : '2.5s',
+                                        backgroundColor: (syncState === 'synced') ? '#06b6d4' : '#f43f5e', boxShadow: (syncState === 'synced') ? '0 0 10px #06b6d4' : '0 0 5px #f43f5e',
+                                        opacity: syncState === 'animating_sync' ? 0.3 : ((syncState === 'synced') ? 0 : 0.6), zIndex: (syncState === 'synced') ? 1 : 10
+                                    };
+                                    return <div key={p.id} className="particle absolute top-1/2 left-1/2 w-2 h-2 -ml-1 -mt-1 rounded-full" style={style}></div>;
+                                })}
+
+                                <div className={`absolute top-1/2 left-1/2 w-16 h-16 -ml-8 -mt-8 rounded-full bg-cyan-400/20 blur-xl transition-all duration-1000 ${syncState === 'synced' ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}></div>
+
+                                <div className={`absolute left-6 top-6 text-xs font-mono-sci font-bold tracking-widest text-left transition-opacity duration-500 ${syncState === 'unsynced' ? 'text-rose-400 opacity-100' : 'opacity-0'}`}>
+                                    {t.sim.statusMyth}<br/><span className="text-[10px] text-slate-500">{t.sim.statusMythSub}</span>
+                                </div>
+                                <div className={`absolute left-6 top-6 text-xs font-mono-sci font-bold tracking-widest text-left transition-opacity duration-500 text-amber-400 ${syncState === 'animating_sync' ? 'opacity-100' : 'opacity-0'}`}>
+                                    {t.sim.statusCalc}<br/><span className="text-[10px] text-slate-500">{t.sim.statusCalcSub}</span>
+                                </div>
+                                <div className={`absolute left-6 top-6 text-xs font-mono-sci font-bold tracking-widest text-left transition-opacity duration-500 text-purple-400 ${syncState === 'animating_unsync' ? 'opacity-100' : 'opacity-0'}`}>
+                                    {t.sim.statusUnsync}<br/><span className="text-[10px] text-slate-500">{t.sim.statusUnsyncSub}</span>
+                                </div>
+                                <div className={`absolute left-6 top-6 text-xs font-mono-sci font-bold tracking-widest text-left transition-opacity duration-500 glow-text-cyan ${syncState === 'synced' ? 'text-cyan-400 opacity-100' : 'opacity-0'}`}>
+                                    {t.sim.statusFact}<br/><span className="text-[10px] text-cyan-700">{t.sim.statusFactSub}</span>
+                                </div>
+                            </div>
+
+                            {/* READOUT PANELS & TABLE */}
+                            <div className="w-full max-w-4xl grid lg:grid-cols-2 gap-6 items-stretch mb-12">
+                                <div className="flex flex-col gap-4">
+                                    <div className={`p-6 rounded-xl border transition-all duration-500 flex-1 flex flex-col justify-center ${syncState === 'unsynced' || syncState === 'animating_unsync' ? 'border-rose-900/50 bg-rose-950/10' : 'border-slate-800 bg-slate-900/30 grayscale opacity-40'}`}>
+                                        <div className="text-xs uppercase text-slate-500 mb-2 font-mono-sci">{t.sim.mythLabel}</div>
+                                        <div className={`text-xl font-mono-sci font-bold mb-2 ${syncState === 'unsynced' || syncState === 'animating_unsync' ? 'glow-text-red text-rose-400' : 'text-slate-500'}`} dir="ltr">{eventContent.mythRange}</div>
+                                        <div className={`text-sm leading-relaxed ${syncState === 'unsynced' || syncState === 'animating_unsync' ? 'text-rose-200' : 'text-slate-500'}`}>{eventContent.mythText}</div>
+                                    </div>
+                                    
+                                    <div className={`p-6 rounded-xl border transition-all duration-500 flex-1 flex flex-col justify-center ${syncState === 'synced' ? 'border-cyan-500/50 bg-cyan-950/20 glow-box-cyan' : 'border-slate-800 bg-slate-900/30'}`}>
+                                        <div className="text-xs uppercase text-slate-500 mb-2 font-mono-sci">{t.sim.factLabel}</div>
+                                        <div className={`text-xl font-mono-sci font-bold mb-2 ${syncState === 'synced' ? 'glow-text-cyan text-cyan-400' : 'text-slate-600'}`} dir="ltr">{eventContent.factRange}</div>
+                                        <div className={`text-sm leading-relaxed mb-4 transition-opacity ${syncState === 'synced' ? 'text-cyan-100 opacity-100' : 'text-slate-600 opacity-20'}`}>{eventContent.factText}</div>
+                                        
+                                        <div className={`flex flex-wrap gap-4 pt-3 border-t transition-opacity duration-500 ${syncState === 'synced' ? 'border-cyan-900/50 opacity-100' : 'border-slate-800 opacity-0'}`}>
+                                            <div className="text-xs">
+                                                <span className="text-slate-500 block mb-1">{t.sim.anchorLabel}</span>
+                                                <span className="text-cyan-400 font-mono-sci font-semibold">{selectedEvent.anchor}</span>
+                                            </div>
+                                            <div className="text-xs font-bold">
+                                                <span className="text-slate-500 block mb-1">{t.sim.aIndexLabel}</span>
+                                                <span className="glow-text-emerald font-mono-sci text-emerald-400 text-sm">A_model={selectedEvent.aIndex}%</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-4">
+                                    <div className="p-6 rounded-xl border border-slate-800 bg-slate-900/30 flex flex-col justify-between flex-1">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
+                                                <i data-lucide="binary" className="w-4 h-4 text-cyan-400"></i>
+                                                {t.sim.tableTitle}
+                                            </h3>
+                                            <div className="overflow-x-auto hide-scrollbar">
+                                                <table className="w-full text-xs text-right text-slate-400 border-collapse">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-800 text-slate-500">
+                                                            <th className="py-2 text-start">{t.sim.colSample}</th>
+                                                            <th className="py-2 px-2">{t.sim.colUnmodelled}</th>
+                                                            <th className="py-2 px-2">{t.sim.colModelled}</th>
+                                                            <th className="py-2 text-center">{t.sim.colAgreement}</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {selectedEvent.samples.map((s, idx) => (
+                                                            <tr key={idx} className="border-b border-slate-800/40 hover:bg-slate-900/20 sample-row">
+                                                                <td className="py-3 font-mono-sci text-slate-200 text-start">{s.id}<span className="block text-[10px] text-slate-500 font-sans">{lang === 'he' ? s.en : s.en}</span></td>
+                                                                <td className="py-3 px-2 font-mono-sci" dir="ltr">{s.unmodelled}</td>
+                                                                <td className="py-3 px-2 font-mono-sci transition-colors duration-500" dir="ltr" style={{ color: syncState === 'synced' ? '#22d3ee' : '#475569' }}>{syncState === 'synced' ? s.modelled : 'Pending...'}</td>
+                                                                <td className="py-3 text-center font-mono-sci font-bold transition-colors duration-500" style={{ color: syncState === 'synced' ? '#34d399' : '#475569' }}>{syncState === 'synced' ? s.aComb : '---'}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        
+                                        <button onClick={handleSync} disabled={syncState === 'animating_sync' || syncState === 'animating_unsync'} 
+                                            className={`w-full mt-6 h-16 rounded-xl font-title font-bold text-xl uppercase tracking-wider transition-all duration-300 ${syncState === 'animating_sync' ? 'bg-amber-600/50 text-amber-200 border border-amber-500/50 cursor-wait' : syncState === 'animating_unsync' ? 'bg-purple-600/50 text-purple-200 border border-purple-500/50 cursor-wait' : syncState === 'synced' ? 'bg-slate-800 text-slate-400 hover:bg-slate-700 border border-slate-700' : 'bg-cyan-600 text-white hover:bg-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.4)]'}`}>
+                                            {syncState === 'animating_sync' ? t.sim.btnCalc : syncState === 'animating_unsync' ? t.sim.btnUnsyncing : syncState === 'synced' ? t.sim.btnReset : t.sim.btnSync}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* FOOTER */}
+                    <footer id="research" className="border-t border-slate-800/50 bg-[#01030a] py-12 text-center">
+                        <div className="flex justify-center items-center gap-2 mb-4">
+                            <i data-lucide="infinity" className="w-5 h-5 text-slate-500"></i>
+                            <span className="font-title font-bold text-slate-500 tracking-widest" dir="ltr">CHRONOMICRA PROJECT</span>
+                        </div>
+                        <p className="text-sm text-slate-600 mb-6">{t.footer.desc}</p>
+                        <div className="flex justify-center gap-6 text-sm text-cyan-600 font-semibold">
+                            <a href="#about" className="hover:text-cyan-400">{t.footer.about}</a>
+                            <a href="archeologin.html" className="hover:text-cyan-400 font-bold">{t.footer.archeologin}</a>
+                            <a href="#" className="hover:text-cyan-400">{t.footer.contact}</a>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

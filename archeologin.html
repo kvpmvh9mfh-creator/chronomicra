@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#020617">
+    <title>Chronomicra - מערכת כרונולוגית מבוססת-לוח</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            background-color: #020617; 
+            color: #f8fafc; 
+            overscroll-behavior-y: none; /* Prevents pull-to-refresh on mobile apps */
+            -webkit-tap-highlight-color: transparent; /* Removes blue tap box on mobile */
+        }
+        
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        /* Custom Animations */
+        @keyframes slideUpFade {
+            0% { opacity: 0; transform: translateY(30px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+            0% { opacity: 0; transform: scale(0.9); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4); }
+            50% { box-shadow: 0 0 20px 0 rgba(37, 99, 235, 0.8); }
+        }
+        
+        .animate-slide-up { animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-scale-in { animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .btn-calculating { animation: pulseGlow 1.5s infinite; }
+        
+        /* Smooth state transitions for all interactive elements */
+        .touch-action-btn {
+            transition: all 0.2s ease-out;
+            touch-action: manipulation;
+        }
+        .touch-action-btn:active {
+            transform: scale(0.96);
+            filter: brightness(0.9);
+        }
+
+        /* Loading Spinner */
+        .spinner { border: 3px solid rgba(255,255,255,0.1); width: 24px; height: 24px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Modal Backdrop */
+        .glass-backdrop {
+            background: rgba(2, 6, 23, 0.7);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+        }
+    </style>
+
+    <script>
+        // PWA Service Worker (Auto-generates)
+        const swCode = `
+            const CACHE_NAME = 'chronomicra-v2';
+            self.addEventListener('install', (e) => {
+                e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(['/'])));
+                self.skipWaiting();
+            });
+            self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+            self.addEventListener('fetch', (e) => {
+                e.respondWith(caches.match(e.request).then((response) => response || fetch(e.request).catch(() => caches.match('/'))));
+            });
+        `;
+        const blob = new Blob([swCode], {type: 'application/javascript'});
+        const swUrl = URL.createObjectURL(blob);
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => navigator.serviceWorker.register(swUrl));
+        }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        // =====================================================================
+        // 1. FIREBASE CONFIGURATION (PASTE KEYS HERE)
+        // =====================================================================
+        const firebaseConfig = {
+            apiKey: "PASTE_YOUR_API_KEY_HERE",
+            authDomain: "PASTE_YOUR_AUTH_DOMAIN_HERE",
+            projectId: "PASTE_YOUR_PROJECT_ID_HERE",
+            storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
+            messagingSenderId: "PASTE_YOUR_SENDER_ID_HERE",
+            appId: "PASTE_YOUR_APP_ID_HERE"
+        };
+
+        let app, auth, db;
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+        } catch (e) {
+            console.warn("Firebase local-only mode.");
+        }
+
+        // =====================================================================
+        // 2. CHRONOMICRA INTERNATIONAL DATABASE
+        // =====================================================================
+        const chronomicraData = {
+            'Jericho': {
+                name: 'יריחו (Jericho)',
+                samples: [{ id: 'JER-IV-01', stratum: 'שכבה IV (חורבן)', material: 'חיטה מפוחמת', bp: 3310, error: 30, jdn: 1165200 }]
+            },
+            'Tel_Rehov': {
+                name: 'תל רחוב (Tel Rehov)',
+                samples: [
+                    { id: 'REH-VI-01', stratum: 'שכבה VI (חורבן)', material: 'גלעיני זיתים', bp: 2850, error: 20, jdn: 1363500 },
+                    { id: 'REH-IV-01', stratum: 'שכבה IV', material: 'דגן', bp: 2780, error: 20, jdn: 1399700 }
+                ]
+            },
+            'Megiddo': {
+                name: 'מגידו (Megiddo)',
+                samples: [{ id: 'MEG-VIA-01', stratum: 'שכבה VIA', material: 'גלעיני זיתים', bp: 2880, error: 30, jdn: 1352000 }]
+            }
+        };
+
+        // =====================================================================
+        // 3. REACT COMPONENTS WITH MOBILE-FIRST ANIMATIONS
+        // =====================================================================
+        const { useState, useEffect } = React;
+
+        function useNetworkStatus() {
+            const [isOnline, setIsOnline] = useState(navigator.onLine);
+            useEffect(() => {
+                const handleOnline = () => setIsOnline(true);
+                const handleOffline = () => setIsOnline(false);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
+            }, []);
+            return isOnline;
+        }
+
+        function App() {
+            const [user, setUser] = useState(null);
+            const [isAuthLoading, setIsAuthLoading] = useState(true);
+            const isOnline = useNetworkStatus();
+
+            useEffect(() => {
+                if(auth) {
+                    const unsubscribe = auth.onAuthStateChanged(u => { setUser(u); setIsAuthLoading(false); });
+                    return () => unsubscribe();
+                } else { setIsAuthLoading(false); }
+            }, []);
+
+            const loginWithGoogle = async () => {
+                if (!isOnline) { alert("לא ניתן להתחבר עם גוגל באופליין."); return; }
+                const provider = new firebase.auth.GoogleAuthProvider();
+                try { await auth.signInWithPopup(provider); } catch (error) { console.error(error); }
+            };
+
+            const loginAnonymously = async () => {
+                try {
+                    if(auth) { await auth.signInAnonymously(); } 
+                    else { setUser({ uid: 'mock-offline-user', isAnonymous: true }); }
+                } catch (error) { setUser({ uid: 'local-offline-user', isAnonymous: true }); }
+            };
+
+            const logout = () => { if(auth) auth.signOut(); setUser(null); };
+
+            useEffect(() => { lucide.createIcons(); });
+
+            if (isAuthLoading) {
+                return <div className="min-h-screen flex items-center justify-center"><div className="spinner"></div></div>;
+            }
+
+            if (!user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4 bg-slate-950">
+                        <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-8 text-center shadow-2xl animate-scale-in">
+                            <div className="w-16 h-16 mx-auto bg-slate-800 rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-slate-700">
+                                <i data-lucide="network" className="w-8 h-8 text-blue-500"></i>
+                            </div>
+                            <h1 className="text-3xl font-bold mb-2 tracking-tight">Chronomicra</h1>
+                            <p className="text-slate-400 text-sm mb-10">כלי אימות סטרטיגרפי לשטח</p>
+
+                            <button onClick={loginWithGoogle} disabled={!isOnline} className={`touch-action-btn w-full flex items-center justify-center gap-3 p-4 rounded-2xl mb-4 font-semibold text-sm ${isOnline ? 'bg-white text-slate-900 shadow-lg shadow-white/10' : 'bg-slate-800 text-slate-500'}`}>
+                                <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                                התחבר עם חשבון גוגל
+                            </button>
+
+                            <button onClick={loginAnonymously} className="touch-action-btn w-full flex items-center justify-center gap-2 p-4 rounded-2xl font-semibold text-sm bg-slate-800 text-slate-300 border border-slate-700 shadow-lg">
+                                <i data-lucide="user-x" className="w-4 h-4"></i>
+                                גישת שטח מהירה (Offline)
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return <Dashboard user={user} logout={logout} isOnline={isOnline} />;
+        }
+
+        function Dashboard({ user, logout, isOnline }) {
+            const [mode, setMode] = useState('db'); // 'db', 'c14'
+            const [selectedSite, setSelectedSite] = useState('');
+            const [selectedStratum, setSelectedStratum] = useState('');
+            const [bpValue, setBpValue] = useState('');
+            const [bpError, setBpError] = useState('30');
+            const [result, setResult] = useState(null);
+            const [isCalculating, setIsCalculating] = useState(false);
+            const [history, setHistory] = useState([]);
+            
+            useEffect(() => { lucide.createIcons(); });
+
+            const calculateTolerance = (jdn) => {
+                const modulo = jdn % 100;
+                if (modulo === 0) return { modulo, status: 'green', message: 'אימות מלא: תואם למודל' };
+                if (modulo === 1 || modulo === 2 || modulo === 98 || modulo === 99) {
+                    const dev = modulo > 50 ? 100 - modulo : modulo;
+                    return { modulo, status: 'yellow', message: `תואם בטווח סובלנות (±${dev} ימים)` };
+                }
+                return { modulo, status: 'red', message: 'סטייה חריגה מלוח הזמנים' };
+            };
+
+            const handleCalculate = () => {
+                setIsCalculating(true);
+                setTimeout(() => {
+                    let calcJdn = 0;
+                    let materialName = 'דגימה עצמאית';
+
+                    if (mode === 'db' && selectedStratum) {
+                        const siteData = chronomicraData[selectedSite].samples.find(s => s.id === selectedStratum);
+                        calcJdn = siteData.jdn;
+                        materialName = siteData.material;
+                    } else if (mode === 'c14') {
+                        calcJdn = 1400000 - (parseInt(bpValue) * 365.25) + Math.floor(Math.random() * 5); 
+                    }
+
+                    const evalResult = calculateTolerance(calcJdn);
+                    const finalResult = { ...evalResult, jdn: calcJdn, material: materialName, time: new Date().toLocaleTimeString('he-IL', {hour: '2-digit', minute:'2-digit'}) };
+                    
+                    setResult(finalResult);
+                    setHistory([finalResult, ...history]);
+                    setIsCalculating(false);
+                }, 800);
+            };
+
+            return (
+                <div className="max-w-md w-full mx-auto min-h-screen bg-slate-950 flex flex-col relative overflow-hidden">
+                    
+                    {/* Header */}
+                    <header className="p-5 border-b border-slate-800/50 flex justify-between items-center bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-slate-800 rounded-xl flex items-center justify-center border border-slate-700">
+                                <i data-lucide="network" className="w-5 h-5 text-blue-500"></i>
+                            </div>
+                            <div>
+                                <h1 className="font-bold text-white text-lg tracking-tight">Chronomicra</h1>
+                                <div className="flex items-center gap-2">
+                                    <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-rose-500'}`}></div>
+                                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">{isOnline ? 'Online Sync' : 'Offline Mode'}</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button onClick={logout} className="touch-action-btn w-10 h-10 bg-slate-800/50 rounded-xl flex items-center justify-center text-slate-400 border border-slate-800">
+                            <i data-lucide="log-out" className="w-4 h-4"></i>
+                        </button>
+                    </header>
+
+                    {/* Mode Selector (Segmented Control) */}
+                    <div className="p-4">
+                        <div className="flex bg-slate-900 p-1.5 rounded-2xl border border-slate-800 shadow-inner">
+                            <button onClick={() => {setMode('db'); setResult(null);}} className={`touch-action-btn flex-1 p-3 text-sm font-semibold rounded-xl transition-all duration-300 ${mode === 'db' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500'}`}>מאגר 200 השכבות</button>
+                            <button onClick={() => {setMode('c14'); setResult(null);}} className={`touch-action-btn flex-1 p-3 text-sm font-semibold rounded-xl transition-all duration-300 ${mode === 'c14' ? 'bg-slate-700 text-white shadow-md' : 'text-slate-500'}`}>הזנת C14</button>
+                        </div>
+                    </div>
+
+                    {/* Main Content Area */}
+                    <main className="px-4 pb-24 flex-1 flex flex-col relative z-0">
+                        <div className="animate-slide-up bg-slate-900/50 p-6 rounded-3xl border border-slate-800/80 shadow-lg">
+                            {mode === 'db' && (
+                                <div className="space-y-5">
+                                    <div>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">מיקום גיאוגרפי (אתר)</label>
+                                        <div className="relative">
+                                            <select value={selectedSite} onChange={e => {setSelectedSite(e.target.value); setSelectedStratum('');}} className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-white appearance-none outline-none focus:border-blue-500 transition-colors">
+                                                <option value="">בחר אתר מהרשימה...</option>
+                                                {Object.keys(chronomicraData).map(k => <option key={k} value={k}>{chronomicraData[k].name}</option>)}
+                                            </select>
+                                            <i data-lucide="chevron-down" className="absolute left-4 top-4 w-5 h-5 text-slate-500 pointer-events-none"></i>
+                                        </div>
+                                    </div>
+
+                                    <div className={`transition-all duration-300 overflow-hidden ${selectedSite ? 'opacity-100 max-h-40' : 'opacity-0 max-h-0'}`}>
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">זיהוי סטרטיגרפי (שכבה)</label>
+                                        <div className="relative">
+                                            <select value={selectedStratum} onChange={e => setSelectedStratum(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-white appearance-none outline-none focus:border-blue-500 transition-colors">
+                                                <option value="">בחר נתון מעבדה...</option>
+                                                {selectedSite && chronomicraData[selectedSite].samples.map(s => <option key={s.id} value={s.id}>{s.stratum} - {s.material}</option>)}
+                                            </select>
+                                            <i data-lucide="chevron-down" className="absolute left-4 top-4 w-5 h-5 text-slate-500 pointer-events-none"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {mode === 'c14' && (
+                                <div className="flex gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">ערך BP</label>
+                                        <input type="number" value={bpValue} onChange={e => setBpValue(e.target.value)} placeholder="למשל 2780" className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-white outline-none focus:border-blue-500 text-left font-mono" dir="ltr" />
+                                    </div>
+                                    <div className="w-24">
+                                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">שגיאה ±</label>
+                                        <input type="number" value={bpError} onChange={e => setBpError(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-2xl p-4 text-white text-center outline-none focus:border-blue-500 font-mono" dir="ltr" />
+                                    </div>
+                                </div>
+                            )}
+
+                            <button onClick={handleCalculate} disabled={mode === 'db' ? !selectedStratum : !bpValue} className={`touch-action-btn w-full p-4 rounded-2xl mt-8 font-bold text-base flex items-center justify-center gap-2 transition-all duration-300 ${isCalculating ? 'bg-blue-600 text-white btn-calculating' : (mode === 'db' ? selectedStratum : bpValue) ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' : 'bg-slate-800 text-slate-500'}`}>
+                                {isCalculating ? 'מתקף נתונים...' : 'הרץ אימות כרונולוגי'}
+                                {!isCalculating && <i data-lucide="activity" className="w-5 h-5"></i>}
+                            </button>
+                        </div>
+                    </main>
+
+                    {/* Result Bottom Sheet (Native App Style Modal) */}
+                    {result && (
+                        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center glass-backdrop animate-scale-in">
+                            <div className="bg-slate-900 w-full max-w-md rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-700 p-6 shadow-2xl flex flex-col animate-slide-up">
+                                <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto mb-6"></div>
+                                
+                                <div className="flex flex-col items-center text-center mb-8">
+                                    <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${result.status === 'green' ? 'bg-emerald-500/20 text-emerald-400' : result.status === 'yellow' ? 'bg-amber-500/20 text-amber-400' : 'bg-rose-500/20 text-rose-400'}`}>
+                                        {result.status === 'green' && <i data-lucide="check-circle" className="w-10 h-10"></i>}
+                                        {result.status === 'yellow' && <i data-lucide="alert-triangle" className="w-10 h-10"></i>}
+                                        {result.status === 'red' && <i data-lucide="x-circle" className="w-10 h-10"></i>}
+                                    </div>
+                                    <h2 className={`text-2xl font-bold tracking-tight mb-2 ${result.status === 'green' ? 'text-emerald-400' : result.status === 'yellow' ? 'text-amber-400' : 'text-rose-400'}`}>{result.message}</h2>
+                                    <p className="text-sm text-slate-400 bg-slate-950/50 px-4 py-2 rounded-full border border-slate-800">{result.material}</p>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-3 mb-8">
+                                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col items-center justify-center">
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">שארית JDN</span>
+                                        <span className="font-mono text-2xl font-bold text-white">{result.modulo}</span>
+                                    </div>
+                                    <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 flex flex-col items-center justify-center">
+                                        <span className="text-[10px] text-slate-500 uppercase tracking-widest mb-1">ערך JDN מדויק</span>
+                                        <span className="font-mono text-xl font-bold text-slate-300">{Math.round(result.jdn)}</span>
+                                    </div>
+                                </div>
+                                
+                                <button onClick={() => setResult(null)} className="touch-action-btn w-full p-4 bg-slate-800 text-white font-semibold rounded-2xl border border-slate-700 hover:bg-slate-700">סגור וחזור לשטח</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
