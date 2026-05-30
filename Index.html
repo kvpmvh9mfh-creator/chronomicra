@@ -1,0 +1,207 @@
+```html
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>כרונומיקרה - סורק ארטיפקטים</title>
+    <!-- Tailwind CSS לעיצוב -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome לאייקונים -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700&display=swap');
+        body { font-family: 'Heebo', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col items-center p-4 sm:p-8">
+
+    <!-- מיכל ראשי -->
+    <main class="w-full max-w-md mt-8">
+        <!-- כותרת עליונה -->
+        <header class="text-center mb-8">
+            <div class="inline-block p-4 rounded-full bg-blue-600/20 text-blue-400 mb-4 shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+                <i class="fa-solid fa-microscope text-4xl"></i>
+            </div>
+            <h1 class="text-3xl font-bold tracking-tight text-white">כרונומיקרה</h1>
+            <p class="text-slate-400 mt-2">בינה מלאכותית לניתוח ארכיאולוגי בשטח</p>
+        </header>
+
+        <!-- אזור העלאת קובץ -->
+        <div class="bg-slate-800 rounded-2xl shadow-xl p-6 border border-slate-700">
+            <div id="upload-section" class="flex flex-col items-center justify-center border-2 border-dashed border-slate-600 rounded-xl p-8 hover:border-blue-500 transition-colors cursor-pointer bg-slate-800/50" onclick="document.getElementById('file-upload').click()">
+                <i class="fa-solid fa-cloud-arrow-up text-4xl text-slate-400 mb-4"></i>
+                <p class="text-center text-sm text-slate-300 font-semibold">לחץ לבחירת תמונת ארטיפקט</p>
+                <p class="text-center text-xs text-slate-500 mt-1">JPEG, PNG עד 10MB</p>
+                <input id="file-upload" type="file" accept="image/*" class="hidden" />
+            </div>
+
+            <!-- אזור תצוגה מקדימה (מוסתר כברירת מחדל) -->
+            <div id="preview-section" class="hidden flex flex-col items-center mt-4">
+                <img id="image-preview" class="w-full h-48 object-cover rounded-lg border border-slate-600 mb-4" />
+                <button id="btn-analyze" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-bolt"></i> הרץ ניתוח בינה מלאכותית
+                </button>
+            </div>
+
+            <!-- מצב טעינה -->
+            <div id="loading-section" class="hidden flex flex-col items-center mt-6 py-4">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl text-blue-500 mb-3"></i>
+                <p id="loading-text" class="text-slate-300 text-sm font-medium animate-pulse">מעלה לענן...</p>
+            </div>
+        </div>
+
+        <!-- אזור תוצאות (מוסתר כברירת מחדל) -->
+        <div id="results-section" class="hidden mt-6 bg-slate-800 rounded-2xl shadow-xl p-6 border border-green-900/50">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-check-circle text-green-500"></i> ניתוח ה-AI הושלם
+            </h2>
+            <div id="tags-container" class="flex flex-wrap gap-2">
+                <!-- כאן יוזרקו התגיות של ה-AI -->
+            </div>
+            <button onclick="resetApp()" class="mt-6 w-full bg-slate-700 hover:bg-slate-600 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                סרוק ארטיפקט נוסף
+            </button>
+        </div>
+    </main>
+
+    <!-- הטמעת Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+        import { getFirestore, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // הגדרות Firebase - עודכן עם הנתונים שסיפקת
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBiFshuLDmF314DhflBNXphc00_sSDIMDo",
+            authDomain: "chronomicra-9a82c.firebaseapp.com",
+            projectId: "chronomicra-9a82c",
+            storageBucket: "chronomicra-9a82c.firebasestorage.app",
+            messagingSenderId: "268768133074",
+            appId: "1:268768133074:web:897c946b6cfff4cca0120b",
+            measurementId: "G-2Y54N873NK"
+        };
+
+        // אתחול מערכות Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const storage = getStorage(app);
+        const db = getFirestore(app);
+
+        // אלמנטים בממשק
+        const fileInput = document.getElementById('file-upload');
+        const uploadSection = document.getElementById('upload-section');
+        const previewSection = document.getElementById('preview-section');
+        const imagePreview = document.getElementById('image-preview');
+        const btnAnalyze = document.getElementById('btn-analyze');
+        const loadingSection = document.getElementById('loading-section');
+        const loadingText = document.getElementById('loading-text');
+        const resultsSection = document.getElementById('results-section');
+        const tagsContainer = document.getElementById('tags-container');
+
+        let selectedFile = null;
+
+        // התחברות אנונימית נדרשת כדי לכתוב ולקרוא ממסד הנתונים
+        signInAnonymously(auth).catch((error) => {
+            console.error("Auth Error:", error);
+            alert("האימות נכשל. בדוק הרשאות Firebase.");
+        });
+
+        // טיפול בבחירת קובץ מהמכשיר
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                selectedFile = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    uploadSection.classList.add('hidden');
+                    previewSection.classList.remove('hidden');
+                    resultsSection.classList.add('hidden');
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        });
+
+        // טיפול בלחיצה על כפתור הניתוח
+        btnAnalyze.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            // עדכון הממשק למצב טעינה
+            previewSection.classList.add('hidden');
+            loadingSection.classList.remove('hidden');
+            loadingText.innerText = "מעלה לאחסון בענן...";
+
+            try {
+                // 1. יצירת מזהה דוח ייחודי מבוסס זמן
+                const reportId = `report_${Date.now()}`;
+                
+                // 2. העלאת הקובץ ל-Firebase Storage (מה שיעיר את ה-Cloud Function שכתבנו)
+                const storageRef = ref(storage, `${reportId}.jpg`); 
+                
+                await uploadBytes(storageRef, selectedFile);
+                
+                // 3. עדכון סטטוס טעינה במסך
+                loadingText.innerText = "מעבד ניתוח בינה מלאכותית...";
+
+                // 4. האזנה ל-Firestore לקבלת התשובה מהפונקציה
+                const docRef = doc(db, "field_reports", reportId);
+                
+                const unsubscribe = onSnapshot(docRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        
+                        // בדיקה האם השרת סיים וכתב את התגיות
+                        if (data.status === "analyzed" && data.ai_tags) {
+                            displayResults(data.ai_tags);
+                            unsubscribe(); // הפסקת ההאזנה לאחר קבלת הנתונים
+                        }
+                    }
+                }, (error) => {
+                    console.error("Firestore Error:", error);
+                    loadingText.innerText = "שגיאה בניתוח הארטיפקט.";
+                    loadingText.classList.replace("text-blue-500", "text-red-500");
+                });
+
+            } catch (error) {
+                console.error("Upload Error:", error);
+                loadingText.innerText = "ההעלאה נכשלה. אנא נסה שוב.";
+                loadingText.classList.replace("text-blue-500", "text-red-500");
+            }
+        });
+
+        // הצגת תגיות ה-AI על המסך
+        function displayResults(tags) {
+            loadingSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            tagsContainer.innerHTML = ''; 
+
+            if (tags.length === 0) {
+                tagsContainer.innerHTML = '<span class="text-sm text-slate-400">לא זוהו אובייקטים.</span>';
+                return;
+            }
+
+            tags.forEach(tag => {
+                const badge = document.createElement('span');
+                badge.className = "bg-blue-900/50 text-blue-300 border border-blue-700/50 px-3 py-1 rounded-full text-sm font-medium";
+                // התגיות חוזרות באנגלית מ-Google Vision API
+                badge.innerText = tag;
+                tagsContainer.appendChild(badge);
+            });
+        }
+
+        // איפוס האפליקציה לסריקה חדשה
+        window.resetApp = function() {
+            selectedFile = null;
+            fileInput.value = '';
+            resultsSection.classList.add('hidden');
+            uploadSection.classList.remove('hidden');
+        };
+    </script>
+</body>
+</html>
+
+
+```
