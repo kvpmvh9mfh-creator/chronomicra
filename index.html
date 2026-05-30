@@ -139,8 +139,7 @@
                 const reportId = `report_${Date.now()}`;
                 
                 // 2. העלאת הקובץ ל-Firebase Storage (מה שיעיר את ה-Cloud Function שכתבנו)
-                const storageRef = ref(storage, `${reportId}.jpg`); 
-                
+const storageRef = ref(storage, scans/${reportId}.jpg);                
                 await uploadBytes(storageRef, selectedFile);
                 
                 // 3. עדכון סטטוס טעינה במסך
