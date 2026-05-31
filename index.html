@@ -98,6 +98,15 @@
             to { opacity: 1; transform: translateX(0); }
         }
 
+        /* Custom Select Styling */
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2338bdf8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem top 50%;
+            background-size: 0.65rem auto;
+        }
+
     </style>
 </head>
 <body class="cyber-grid min-h-screen flex flex-col relative pb-safe">
@@ -166,21 +175,41 @@
                     <h2 id="dashboard-greeting" class="text-2xl font-bold text-white tracking-wide neon-text-blue uppercase">SYSTEM READY</h2>
                     <p class="text-sky-400/80 font-medium tracking-wider text-xs mt-0.5">AWAITING VISUAL INPUT</p>
                 </div>
-                <div class="text-right">
-                    <i class="fa-solid fa-satellite text-sky-500 text-xl animate-pulse"></i>
+            </div>
+
+            <!-- LOCATION MODULE -->
+            <div class="mb-4 bg-[#050b14]/80 border border-sky-900/80 rounded-xl p-4 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs text-sky-400 font-mono tracking-widest"><i class="fa-solid fa-location-crosshairs mr-1"></i> LOCATION MODULE</span>
+                    <i class="fa-solid fa-satellite text-sky-800 text-sm" id="loc-icon"></i>
+                </div>
+                
+                <div class="flex flex-col gap-3">
+                    <div class="flex gap-2">
+                        <button id="btn-gps" class="flex-shrink-0 bg-sky-900/50 hover:bg-sky-800 text-sky-300 border border-sky-700 rounded-lg px-4 py-2 text-sm font-bold brand-text uppercase transition-colors">
+                            <i class="fa-solid fa-satellite-dish mr-1"></i> GPS
+                        </button>
+                        <select id="select-manual-loc" class="flex-grow bg-[#0a192f] text-sky-200 border border-sky-800 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-sky-500">
+                            <option value="">-- SELECT MANUAL SITE --</option>
+                            <!-- Options populated via JS -->
+                        </select>
+                    </div>
+                    <div id="loc-status-panel" class="bg-black/50 rounded p-2 text-[10px] text-sky-500/70 font-mono tracking-wide">
+                        STATUS: AWAITING LOCATION LOCK...
+                    </div>
                 </div>
             </div>
 
             <div class="bg-[#0a192f]/90 backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] p-4 sm:p-6 border border-sky-900/50 relative overflow-hidden flex-grow flex flex-col justify-center">
                 
                 <!-- Upload Area -->
-                <div id="upload-section" class="animate-enter w-full flex flex-col items-center justify-center border-2 border-dashed border-sky-700/50 bg-[#050b14]/50 rounded-xl min-h-[250px] active:bg-sky-900/30 transition-all cursor-pointer" onclick="document.getElementById('file-upload').click()">
+                <div id="upload-section" class="animate-enter w-full flex flex-col items-center justify-center border-2 border-dashed border-sky-700/50 bg-[#050b14]/50 rounded-xl min-h-[220px] active:bg-sky-900/30 transition-all cursor-pointer" onclick="document.getElementById('file-upload').click()">
                     <div class="relative w-20 h-20 mb-3 flex items-center justify-center">
                         <i class="fa-solid fa-expand text-6xl text-sky-900/40 absolute"></i>
                         <i class="fa-solid fa-camera-retro text-4xl text-sky-400 relative z-10"></i>
                     </div>
                     <p class="text-center text-xl text-white font-semibold brand-text tracking-widest mb-1">TAP TO SCAN</p>
-                    <p class="text-center text-sm text-sky-500 uppercase tracking-widest px-4">Initialize Spatial Capture</p>
+                    <p class="text-center text-sm text-sky-500 uppercase tracking-widest px-4">Initialize Visual Capture</p>
                     <input id="file-upload" type="file" accept="image/*" class="hidden" capture="environment" />
                 </div>
 
@@ -195,8 +224,8 @@
                             <div class="flex justify-between items-start w-full">
                                 <div class="mono-text text-[10px] text-sky-300">
                                     <span class="text-sky-500">REC // </span><span id="hud-time">00:00:00</span><br>
-                                    <span id="hud-lat">LAT: ACQUIRING...</span><br>
-                                    <span id="hud-lng">LNG: ACQUIRING...</span>
+                                    <span id="hud-lat">LAT: STANDBY</span><br>
+                                    <span id="hud-lng">LNG: STANDBY</span>
                                 </div>
                                 <div class="w-4 h-4 border-t-2 border-r-2 border-sky-400 animate-pulse"></div>
                             </div>
@@ -204,8 +233,8 @@
                             <div class="flex justify-between items-end w-full">
                                 <div class="w-4 h-4 border-b-2 border-l-2 border-sky-400"></div>
                                 <div class="text-right mono-text text-[10px] text-sky-300 bg-black/50 p-1 rounded">
-                                    <span class="text-sky-500">PROXIMITY TO BASE</span><br>
-                                    <span id="hud-proximity" class="font-bold text-white tracking-widest">CALCULATING...</span>
+                                    <span class="text-sky-500">PROXIMITY TO: <span id="hud-site-name">BASE</span></span><br>
+                                    <span id="hud-proximity" class="font-bold text-white tracking-widest">N/A</span>
                                 </div>
                             </div>
                         </div>
@@ -252,7 +281,8 @@
     <!-- Firebase SDK & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // הוחזר לשימוש ב-signInWithPopup במקום Redirect למניעת לולאות אינסופיות
+        import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -290,10 +320,35 @@
         const resultsSection = document.getElementById('results-section');
         const analysisContainer = document.getElementById('analysis-container');
 
+        // Location UI
+        const btnGps = document.getElementById('btn-gps');
+        const selectManualLoc = document.getElementById('select-manual-loc');
+        const locStatusPanel = document.getElementById('loc-status-panel');
+        const locIcon = document.getElementById('loc-icon');
+
         // State variables
         let selectedFile = null;
-        let spatialData = { lat: null, lng: null, distanceKm: null };
-        const BASE_SITE = { lat: 31.7767, lng: 35.2345 }; // Jerusalem base
+        let spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
+        let currentObjectURL = null;
+
+        // Israel Archaeological Sites Database
+        const ARCH_SITES = [
+            { id: 0, name: "Jerusalem (City of David)", lat: 31.7767, lng: 35.2345 },
+            { id: 1, name: "Megiddo", lat: 32.5833, lng: 35.1833 },
+            { id: 2, name: "Masada", lat: 31.3156, lng: 35.3536 },
+            { id: 3, name: "Caesarea Maritima", lat: 32.5000, lng: 34.8950 },
+            { id: 4, name: "Tel Hazor", lat: 33.0167, lng: 35.5667 },
+            { id: 5, name: "Ashkelon Nat. Park", lat: 31.6667, lng: 34.5667 },
+            { id: 6, name: "Qumran", lat: 31.7412, lng: 35.4589 }
+        ];
+
+        // Populate Select Menu
+        ARCH_SITES.forEach(site => {
+            let option = document.createElement('option');
+            option.value = site.id;
+            option.text = site.name;
+            selectManualLoc.appendChild(option);
+        });
 
         // Safe helper functions
         function showElement(el) {
@@ -318,17 +373,31 @@
             return (R * c).toFixed(2);
         }
 
-        // Handle Redirect Results for Mobile Google Login
-        getRedirectResult(auth).then(function(result) {
-            if (result && result.user) {
-                console.log("Logged in via redirect successfully");
-            }
-        }).catch(function(error) {
-            console.error("Redirect Error:", error);
-            alert("Google Sign In Error: " + error.message);
-        });
+        function findNearestSite(lat, lng) {
+            let nearest = null;
+            let minDist = Infinity;
+            ARCH_SITES.forEach(site => {
+                let dist = parseFloat(calculateDistance(lat, lng, site.lat, site.lng));
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = site;
+                }
+            });
+            return { site: nearest, distance: minDist.toFixed(2) };
+        }
 
-        // Authentication Handlers
+        function updateLocationUI(statusText, isSuccess) {
+            locStatusPanel.innerHTML = statusText;
+            if (isSuccess) {
+                locIcon.classList.add('text-green-400', 'animate-pulse');
+                locIcon.classList.remove('text-sky-800');
+            } else {
+                locIcon.classList.remove('text-green-400', 'animate-pulse');
+                locIcon.classList.add('text-sky-800');
+            }
+        }
+
+        // --- Auth Fix: Popup instead of Redirect ---
         onAuthStateChanged(auth, function(user) {
             if (user) {
                 hideElement(landingSection);
@@ -349,8 +418,14 @@
         });
 
         btnLoginArch.addEventListener('click', function() {
-            // Using Redirect instead of Popup for Mobile reliability
-            signInWithRedirect(auth, googleProvider);
+            signInWithPopup(auth, googleProvider).catch(function(error) {
+                console.error("Popup Error:", error);
+                if (error.code === 'auth/popup-blocked') {
+                    alert("Please allow popups in your browser to log in securely with Google.");
+                } else {
+                    alert("Authentication Error: " + error.message);
+                }
+            });
         });
 
         btnLoginGuest.addEventListener('click', function() {
@@ -361,17 +436,65 @@
             signOut(auth);
         });
 
-        // Object URL memory management
-        let currentObjectURL = null;
+        // --- Location Handlers ---
+        
+        // Manual Location Selection
+        selectManualLoc.addEventListener('change', function(e) {
+            if (!e.target.value) {
+                spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
+                updateLocationUI("STATUS: AWAITING LOCATION LOCK...", false);
+                return;
+            }
+            const site = ARCH_SITES[parseInt(e.target.value)];
+            spatialData = { 
+                lat: site.lat, 
+                lng: site.lng, 
+                distanceKm: "0.00", 
+                nearestSiteName: site.name 
+            };
+            updateLocationUI(<span class="text-green-400">MANUAL OVERRIDE: ${site.name.toUpperCase()} LOCK</span>, true);
+        });
 
-        // Image Selection & GPS Capture
+        // Auto GPS Selection
+        btnGps.addEventListener('click', function() {
+            updateLocationUI("STATUS: ACQUIRING SATELLITE LOCK...", false);
+            selectManualLoc.value = ""; // Reset dropdown
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(position) {
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
+                        const nearest = findNearestSite(lat, lng);
+                        
+                        spatialData = { 
+                            lat: lat.toFixed(5), 
+                            lng: lng.toFixed(5), 
+                            distanceKm: nearest.distance, 
+                            nearestSiteName: nearest.site.name 
+                        };
+                        
+                        updateLocationUI(<span class="text-green-400">GPS LOCK. NEAREST SITE: ${nearest.site.name.toUpperCase()} (${nearest.distance} KM)</span>, true);
+                    }, 
+                    function(error) {
+                        console.warn("GPS Error", error);
+                        updateLocationUI(<span class="text-yellow-500">SIGNAL FAILED OR DENIED. SELECT MANUAL SITE.</span>, false);
+                    }, 
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            } else {
+                updateLocationUI(<span class="text-red-500">GPS NOT SUPPORTED BY HARDWARE</span>, false);
+            }
+        });
+
+        // Image Selection (Update HUD with current Spatial Data)
         fileInput.addEventListener('change', function(e) {
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
                 
-                // FIXED CRASH: Use Object URL instead of FileReader base64!
+                // Memory efficient image display
                 if (currentObjectURL) {
-                    URL.revokeObjectURL(currentObjectURL); // Free memory
+                    URL.revokeObjectURL(currentObjectURL);
                 }
                 currentObjectURL = URL.createObjectURL(selectedFile);
                 imagePreview.src = currentObjectURL;
@@ -380,41 +503,28 @@
                 showElement(previewSection);
                 hideElement(resultsSection);
                 
+                // Update HUD with pre-acquired location data
                 document.getElementById('hud-time').innerText = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
                 
-                // Start GPS Acquisition (Non-blocking)
-                document.getElementById('hud-lat').innerText = "LAT: ACQUIRING...";
-                document.getElementById('hud-lng').innerText = "LNG: ACQUIRING...";
-                document.getElementById('hud-proximity').innerText = "CALCULATING...";
-                
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            spatialData.lat = position.coords.latitude.toFixed(5);
-                            spatialData.lng = position.coords.longitude.toFixed(5);
-                            spatialData.distanceKm = calculateDistance(spatialData.lat, spatialData.lng, BASE_SITE.lat, BASE_SITE.lng);
-                            
-                            document.getElementById('hud-lat').innerText = "LAT: " + spatialData.lat;
-                            document.getElementById('hud-lng').innerText = "LNG: " + spatialData.lng;
-                            
-                            const proxEl = document.getElementById('hud-proximity');
-                            proxEl.innerText = spatialData.distanceKm + " KM";
-                            proxEl.classList.remove('text-white', 'text-green-400', 'text-yellow-400');
-                            if (parseFloat(spatialData.distanceKm) < 5) {
-                                proxEl.classList.add('text-green-400');
-                            } else {
-                                proxEl.classList.add('text-yellow-400');
-                            }
-                        }, 
-                        function(error) {
-                            console.warn("GPS Error", error);
-                            document.getElementById('hud-lat').innerText = "LAT: N/A";
-                            document.getElementById('hud-lng').innerText = "LNG: N/A";
-                            document.getElementById('hud-proximity').innerText = "NO SIGNAL";
-                        }, 
-                        // Increased timeout to 10 seconds for mobile GPS
-                        { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
-                    );
+                if (spatialData.lat) {
+                    document.getElementById('hud-lat').innerText = "LAT: " + spatialData.lat;
+                    document.getElementById('hud-lng').innerText = "LNG: " + spatialData.lng;
+                    document.getElementById('hud-site-name').innerText = spatialData.nearestSiteName.toUpperCase();
+                    
+                    const proxEl = document.getElementById('hud-proximity');
+                    proxEl.innerText = spatialData.distanceKm + " KM";
+                    proxEl.classList.remove('text-white', 'text-green-400', 'text-yellow-400');
+                    if (parseFloat(spatialData.distanceKm) < 5) {
+                        proxEl.classList.add('text-green-400');
+                    } else {
+                        proxEl.classList.add('text-yellow-400');
+                    }
+                } else {
+                    document.getElementById('hud-lat').innerText = "LAT: MISSING";
+                    document.getElementById('hud-lng').innerText = "LNG: MISSING";
+                    document.getElementById('hud-site-name').innerText = "UNKNOWN";
+                    document.getElementById('hud-proximity').innerText = "N/A";
+                    document.getElementById('hud-proximity').classList.add('text-red-400');
                 }
             }
         });
@@ -434,26 +544,22 @@
                 
                 const docRef = doc(db, "field_reports", reportId);
                 
-                // Save document with GPS metadata FIRST
+                // Prepare metadata
                 let locationData = null;
                 if (spatialData.lat) {
                     locationData = { lat: parseFloat(spatialData.lat), lng: parseFloat(spatialData.lng) };
                 }
                 
-                let distData = null;
-                if (spatialData.distanceKm) {
-                    distData = parseFloat(spatialData.distanceKm);
-                }
-
                 await setDoc(docRef, {
                     user_id: userId,
                     timestamp: new Date().toISOString(),
                     location: locationData,
-                    distance_to_base_km: distData,
+                    nearest_site: spatialData.nearestSiteName,
+                    distance_to_site_km: spatialData.distanceKm ? parseFloat(spatialData.distanceKm) : null,
                     status: "uploading"
                 }, { merge: true });
 
-                // --- UPLOAD TO 'scans/' FOLDER ---
+                // Upload visual data
                 loadingText.innerText = "UPLOADING VISUAL DATASET...";
                 const storagePath = "scans/" + reportId + ".jpg";
                 const storageRef = ref(storage, storagePath); 
@@ -496,7 +602,9 @@
             topTags.forEach(function(tag, index) {
                 const confidence = 98 - (index * Math.floor(Math.random() * 5));
                 const source = databases[index % databases.length];
-                const boolLogic = index === 0 ? "TRUE AND PROXIMAL" : "VERIFIED OR CORRELATED";
+                // אם אנחנו קרובים לאתר (פחות מ-5 ק"מ), הוכחת ה-BooleanLogic מתחזקת
+                let isProximal = spatialData.distanceKm && parseFloat(spatialData.distanceKm) < 5;
+                const boolLogic = index === 0 ? (isProximal ? "TRUE AND PROXIMAL" : "TRUE (NO PROXIMITY)") : "VERIFIED OR CORRELATED";
                 const colorClass = confidence > 90 ? 'text-green-400' : 'text-yellow-400';
 
                 const row = document.createElement('div');
@@ -530,7 +638,4 @@
         };
     </script>
 </body>
-</html>
-
-
-```
+</html
