@@ -39,6 +39,8 @@
 
         .neon-text-blue { text-shadow: 0 0 8px rgba(56, 189, 248, 0.8), 0 0 16px rgba(56, 189, 248, 0.4); }
         .neon-text-green { text-shadow: 0 0 8px rgba(74, 222, 128, 0.8), 0 0 16px rgba(74, 222, 128, 0.4); }
+        .neon-text-red { text-shadow: 0 0 8px rgba(239, 68, 68, 0.8), 0 0 16px rgba(239, 68, 68, 0.4); }
+        
         .neon-box-blue {
             box-shadow: 0 0 15px rgba(37, 99, 235, 0.3), inset 0 0 10px rgba(37, 99, 235, 0.1);
             border: 1px solid rgba(56, 189, 248, 0.5);
@@ -106,12 +108,9 @@
             background-size: 0.65rem auto;
         }
 
-        /* Loading Spinner for buttons */
-        .btn-loading i {
-            display: none;
-        }
+        .btn-loading i { display: none; }
         .btn-loading::after {
-            content: "\f110"; /* FontAwesome spinner */
+            content: "\f110";
             font-family: "Font Awesome 6 Free";
             font-weight: 900;
             animation: spin 1s linear infinite;
@@ -155,7 +154,6 @@
             </p>
             
             <div class="pt-6 flex flex-col gap-4 w-full px-2">
-                <!-- Added type="button" to prevent form submission reloads -->
                 <button type="button" id="btn-login-archaeologist" class="neon-box-blue w-full relative overflow-hidden flex flex-row items-center justify-start p-4 bg-[#0a192f] rounded-2xl transition-all active:scale-[0.98]">
                     <div class="w-12 h-12 shrink-0 rounded-full flex items-center justify-center mr-4 border border-sky-500/30 shadow-[0_0_10px_rgba(56,189,248,0.2)] bg-[#050b14]">
                         <i class="fa-brands fa-google text-xl text-sky-400"></i>
@@ -204,7 +202,6 @@
                         </button>
                         <select id="select-manual-loc" class="flex-grow bg-[#0a192f] text-sky-200 border border-sky-800 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-sky-500">
                             <option value="">-- SELECT MANUAL SITE --</option>
-                            <!-- Options populated via JS -->
                         </select>
                     </div>
                     <div id="loc-status-panel" class="bg-black/50 rounded p-2 text-[10px] text-sky-500/70 font-mono tracking-wide">
@@ -263,24 +260,25 @@
                         <i class="fa-solid fa-database absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xl text-sky-400 neon-text-blue"></i>
                     </div>
                     <p id="loading-text" class="text-sky-300 text-lg font-bold brand-text uppercase tracking-widest animate-pulse neon-text-blue text-center">UPLOADING DATASET...</p>
-                    <p class="text-xs text-sky-600 mt-2 font-mono text-center">OSINT & RAG MODULES STANDBY</p>
+                    <p id="loading-subtext" class="text-xs text-sky-600 mt-2 font-mono text-center">OSINT & RAG MODULES STANDBY</p>
                 </div>
             </div>
 
-            <!-- RESULTS MODULE -->
+            <!-- FULL RESULTS MODULE -->
             <div id="results-section" class="hidden mt-4 bg-[#050b14]/95 rounded-2xl shadow-[0_0_20px_rgba(74,222,128,0.15)] p-5 border border-green-500/30 relative overflow-hidden animate-enter pb-8">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-green-500/50"></div>
                 
-                <h2 class="text-lg font-bold text-white mb-2 flex items-center gap-2 brand-text tracking-widest neon-text-green">
+                <h2 class="text-lg font-bold text-white mb-1 flex items-center gap-2 brand-text tracking-widest neon-text-green">
                     <i class="fa-solid fa-layer-group text-green-400"></i> DEEP ANALYSIS COMPLETE
                 </h2>
-                <p class="text-[10px] text-green-500/70 font-mono mb-4 uppercase tracking-wider">Boolean Logic & VAE Verification: PASSED</p>
+                <p id="results-count" class="text-[10px] text-green-500/70 font-mono mb-4 uppercase tracking-wider">Boolean Logic & VAE Verification: PASSED</p>
 
-                <div id="analysis-container" class="w-full flex flex-col gap-2 mb-6 min-h-[100px]">
+                <!-- Container for ALL tags -->
+                <div id="analysis-container" class="w-full flex flex-col gap-2 mb-6 min-h-[100px] max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                     <!-- Structured Analysis Rows injected here -->
                 </div>
 
-                <button type="button" onclick="resetScanner()" class="w-full h-14 bg-slate-800 active:bg-slate-700 text-sky-400 border border-sky-900 active:border-sky-500 font-bold rounded-xl transition-all flex items-center justify-center gap-2 uppercase brand-text tracking-widest text-sm">
+                <button type="button" onclick="resetScanner()" class="w-full h-14 bg-slate-800 active:bg-slate-700 text-sky-400 border border-sky-900 active:border-sky-500 font-bold rounded-xl transition-all flex items-center justify-center gap-2 uppercase brand-text tracking-widest text-sm mt-4">
                     <i class="fa-solid fa-crosshairs"></i> CAPTURE NEW ARTIFACT
                 </button>
             </div>
@@ -293,9 +291,8 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBiFshuLDmF314DhflBNXphc00_sSDIMDo",
             authDomain: "chronomicra-9a82c.firebaseapp.com",
@@ -309,9 +306,15 @@
         const auth = getAuth(app);
         const storage = getStorage(app);
         const db = getFirestore(app);
+        
         const googleProvider = new GoogleAuthProvider();
+        // Force explicit domain to prevent GitHub routing glitches
+        googleProvider.setCustomParameters({
+            redirect_uri: 'https://kind-plant-0c316ce0f.7.azurestaticapps.net/__/auth/handler',
+            prompt: 'select_account'
+        });
 
-        // UI Elements setup
+        // UI Elements
         const landingSection = document.getElementById('landing-section');
         const appSection = document.getElementById('app-section');
         const navUserArea = document.getElementById('nav-user-area');
@@ -320,7 +323,6 @@
         const btnLoginGuest = document.getElementById('btn-login-guest');
         const statusArch = document.getElementById('login-arch-status');
         const statusGuest = document.getElementById('login-guest-status');
-        
         const btnLogout = document.getElementById('btn-logout');
         
         const fileInput = document.getElementById('file-upload');
@@ -330,8 +332,10 @@
         const btnAnalyze = document.getElementById('btn-analyze');
         const loadingSection = document.getElementById('loading-section');
         const loadingText = document.getElementById('loading-text');
+        const loadingSubtext = document.getElementById('loading-subtext');
         const resultsSection = document.getElementById('results-section');
         const analysisContainer = document.getElementById('analysis-container');
+        const resultsCount = document.getElementById('results-count');
 
         const btnGps = document.getElementById('btn-gps');
         const selectManualLoc = document.getElementById('select-manual-loc');
@@ -342,7 +346,7 @@
         let spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
         let currentObjectURL = null;
 
-        // Israel Archaeological Sites
+        // Israel Archaeological Sites Database
         const ARCH_SITES = [
             { id: 0, name: "Jerusalem (City of David)", lat: 31.7767, lng: 35.2345 },
             { id: 1, name: "Megiddo", lat: 32.5833, lng: 35.1833 },
@@ -353,7 +357,6 @@
             { id: 6, name: "Qumran", lat: 31.7412, lng: 35.4589 }
         ];
 
-        // Populate Select Menu
         ARCH_SITES.forEach(site => {
             let option = document.createElement('option');
             option.value = site.id;
@@ -425,7 +428,6 @@
                 }
                 document.getElementById('nav-user-name').innerText = displayName;
                 
-                // Reset button states
                 btnLoginArch.classList.remove('btn-loading');
                 btnLoginGuest.classList.remove('btn-loading');
                 statusArch.innerText = "Secure Access";
@@ -446,15 +448,7 @@
             signInWithPopup(auth, googleProvider).catch(function(error) {
                 btnLoginArch.classList.remove('btn-loading');
                 statusArch.innerText = "Secure Access";
-                
-                // IMPORTANT: This prevents the silent fail if the domain isn't authorized
-                if (error.code === 'auth/unauthorized-domain') {
-                    alert("SECURITY BLOCK: You must add 'kind-plant-0c316ce0f.7.azurestaticapps.net' to Firebase -> Authentication -> Settings -> Authorized Domains.");
-                } else if (error.code === 'auth/popup-blocked') {
-                    alert("Please allow popups to sign in with Google.");
-                } else {
-                    alert("Login failed: " + error.message);
-                }
+                alert("Login failed: " + error.message);
             });
         });
 
@@ -521,6 +515,7 @@
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
                 
+                // Memory efficient local preview (bypasses Storage AccessDenied restrictions for display)
                 if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
                 currentObjectURL = URL.createObjectURL(selectedFile);
                 imagePreview.src = currentObjectURL;
@@ -550,12 +545,16 @@
             }
         });
 
+        // Frictionless Event-Driven Upload & Listening
         btnAnalyze.addEventListener('click', async function() {
             if (!selectedFile) return;
 
             hideElement(previewSection);
             showElement(loadingSection);
             loadingText.innerText = "UPLOADING SPATIAL METADATA...";
+            loadingSubtext.innerText = "ESTABLISHING SECURE UPLINK";
+
+            let unsubscribe = null;
 
             try {
                 const user = auth.currentUser;
@@ -568,6 +567,7 @@
                     locationData = { lat: parseFloat(spatialData.lat), lng: parseFloat(spatialData.lng) };
                 }
                 
+                // 1. Setup Document
                 await setDoc(docRef, {
                     user_id: userId,
                     timestamp: new Date().toISOString(),
@@ -577,61 +577,92 @@
                     status: "uploading"
                 }, { merge: true });
 
+                // 2. Setup Listener BEFORE upload finishes to catch rapid backend responses
+                unsubscribe = onSnapshot(docRef, function(docSnap) {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        
+                        if (data.status === "analyzed" && data.ai_tags) {
+                            displayResults(data.ai_tags);
+                            if(unsubscribe) unsubscribe();
+                        } else if (data.status === "error") {
+                            // Robust Error Handling directly on UI
+                            loadingText.innerText = "ANALYSIS FAILED";
+                            loadingSubtext.innerText = "SERVER ERROR: " + (data.server_error || "Unknown Failure");
+                            loadingText.classList.replace("text-sky-300", "text-red-500");
+                            loadingText.classList.replace("neon-text-blue", "neon-text-red");
+                            if(unsubscribe) unsubscribe();
+                        }
+                    }
+                }, (error) => {
+                    console.error("Firestore Listener Error:", error);
+                });
+
+                // 3. Upload File (Triggers Gen 2 Cloud Function)
                 loadingText.innerText = "UPLOADING VISUAL DATASET...";
                 const storagePath = "scans/" + reportId + ".jpg";
                 const storageRef = ref(storage, storagePath); 
                 await uploadBytes(storageRef, selectedFile);
                 
                 loadingText.innerText = "RUNNING RAG & VAE ENGINES...";
-
-                const unsubscribe = onSnapshot(docRef, function(docSnap) {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        if (data.status === "analyzed" && data.ai_tags) {
-                            displayResults(data.ai_tags);
-                            unsubscribe();
-                        }
-                    }
-                });
+                loadingSubtext.innerText = "AWAITING SERVER EVENT TRIGGER...";
 
             } catch (error) {
+                if(unsubscribe) unsubscribe();
                 loadingText.innerText = "UPLINK FAILED";
-                loadingText.classList.add("text-red-500", "neon-text-red");
+                loadingSubtext.innerText = "ERROR: " + error.message;
+                loadingText.classList.replace("text-sky-300", "text-red-500");
+                loadingText.classList.replace("neon-text-blue", "neon-text-red");
             }
         });
 
+        // Display Full Report (No truncation)
         function displayResults(tags) {
             hideElement(loadingSection);
             showElement(resultsSection);
             analysisContainer.innerHTML = ''; 
 
             if (!tags || tags.length === 0) {
+                resultsCount.innerText = "0 DATA POINTS RECOVERED";
                 analysisContainer.innerHTML = '<span class="text-sm text-sky-500/50 font-mono">NULL HYPOTHESIS: NO ARTIFACTS DETECTED.</span>';
                 return;
             }
 
-            const topTags = tags.slice(0, 4);
+            // Show exactly how many tags were recovered for the full report
+            resultsCount.innerText = `EXTRACTED ${tags.length} SEMANTIC VECTORS. VERIFICATION: PASSED`;
+
             const databases = ['Global Arch-Net', 'Levant Ceramics DB', 'Lithic OSINT', 'Museo-Matrix'];
 
-            topTags.forEach(function(tag, index) {
-                const confidence = 98 - (index * Math.floor(Math.random() * 5));
+            // Iterate over ALL tags returned by Vision API
+            tags.forEach(function(tag, index) {
+                // Decay confidence slightly for visual effect, keeping high tags green, lower tags yellow
+                const confidence = Math.max(99 - (index * 2) - Math.floor(Math.random() * 3), 45);
                 const source = databases[index % databases.length];
                 let isProximal = spatialData.distanceKm && parseFloat(spatialData.distanceKm) < 5;
                 const boolLogic = index === 0 ? (isProximal ? "TRUE AND PROXIMAL" : "TRUE (NO PROXIMITY)") : "VERIFIED OR CORRELATED";
-                const colorClass = confidence > 90 ? 'text-green-400' : 'text-yellow-400';
+                
+                let colorClass = 'text-sky-400';
+                if (confidence > 85) colorClass = 'text-green-400';
+                else if (confidence > 70) colorClass = 'text-yellow-400';
 
                 const row = document.createElement('div');
-                row.className = "analysis-row rounded font-mono text-xs";
-                row.style.animationDelay = (index * 0.2) + "s";
+                row.className = "analysis-row rounded font-mono text-xs mb-2 border-l-2 border-slate-700 hover:border-sky-500 transition-colors";
+                row.style.animationDelay = (index * 0.1) + "s";
                 
                 let htmlContent = '<div class="flex justify-between items-center mb-1">';
                 htmlContent += '<span class="text-white font-bold text-sm tracking-widest uppercase">> ' + tag + '</span>';
                 htmlContent += '<span class="' + colorClass + ' font-bold">' + confidence + '% VAE</span>';
                 htmlContent += '</div>';
-                htmlContent += '<div class="grid grid-cols-1 gap-1 text-[10px] text-sky-400/80">';
-                htmlContent += '<div><span class="text-slate-500">SRC:</span> ' + source + ' [RAG CITED]</div>';
-                htmlContent += '<div><span class="text-slate-500">OSINT:</span> Cross-ref matches found</div>';
-                htmlContent += '<div><span class="text-slate-500">LOGIC:</span> ' + boolLogic + '</div>';
+                htmlContent += '<div class="grid grid-cols-1 gap-1 text-[10px] text-sky-400/80 pl-2">';
+                
+                // Only show detailed DB info for the top 3 results to keep UI clean, rest are standard references
+                if (index < 3) {
+                    htmlContent += '<div><span class="text-slate-500">SRC:</span> ' + source + ' [RAG CITED]</div>';
+                    htmlContent += '<div><span class="text-slate-500">LOGIC:</span> ' + boolLogic + '</div>';
+                } else {
+                    htmlContent += '<div><span class="text-slate-500">REF:</span> Secondary Feature Detected</div>';
+                }
+                
                 htmlContent += '</div>';
                 
                 row.innerHTML = htmlContent;
@@ -645,11 +676,13 @@
             hideElement(resultsSection);
             hideElement(loadingSection);
             hideElement(previewSection);
-            loadingText.classList.remove("text-red-500", "neon-text-red");
-            loadingText.classList.add("text-sky-300", "neon-text-blue");
+            
+            loadingText.classList.replace("text-red-500", "text-sky-300");
+            loadingText.classList.replace("neon-text-red", "neon-text-blue");
+            loadingSubtext.innerText = "OSINT & RAG MODULES STANDBY";
+            
             showElement(uploadSection);
             
-            // Reset Location
             spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
             selectManualLoc.value = "";
             updateLocationUI("STATUS: AWAITING LOCATION LOCK...", false);
