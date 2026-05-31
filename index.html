@@ -1,4 +1,3 @@
-html
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -253,7 +252,7 @@ html
     <!-- Firebase SDK & Logic -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -294,7 +293,7 @@ html
         // State variables
         let selectedFile = null;
         let spatialData = { lat: null, lng: null, distanceKm: null };
-        const BASE_SITE = { lat: 31.7767, lng: 35.2345 }; // Jerusalem
+        const BASE_SITE = { lat: 31.7767, lng: 35.2345 }; // Jerusalem base
 
         // Safe helper functions
         function showElement(el) {
@@ -319,6 +318,16 @@ html
             return (R * c).toFixed(2);
         }
 
+        // Handle Redirect Results for Mobile Google Login
+        getRedirectResult(auth).then(function(result) {
+            if (result && result.user) {
+                console.log("Logged in via redirect successfully");
+            }
+        }).catch(function(error) {
+            console.error("Redirect Error:", error);
+            alert("Google Sign In Error: " + error.message);
+        });
+
         // Authentication Handlers
         onAuthStateChanged(auth, function(user) {
             if (user) {
@@ -340,62 +349,73 @@ html
         });
 
         btnLoginArch.addEventListener('click', function() {
-            signInWithPopup(auth, googleProvider);
+            // Using Redirect instead of Popup for Mobile reliability
+            signInWithRedirect(auth, googleProvider);
         });
 
         btnLoginGuest.addEventListener('click', function() {
-            signInAnonymously(auth);
+            signInAnonymously(auth).catch(function(err) { alert(err.message); });
         });
 
         btnLogout.addEventListener('click', function() {
             signOut(auth);
         });
 
+        // Object URL memory management
+        let currentObjectURL = null;
+
         // Image Selection & GPS Capture
         fileInput.addEventListener('change', function(e) {
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
-                const reader = new FileReader();
                 
-                reader.onload = function(event) {
-                    imagePreview.src = event.target.result;
-                    hideElement(uploadSection);
-                    showElement(previewSection);
-                    hideElement(resultsSection);
-                    
-                    document.getElementById('hud-time').innerText = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
-                    
-                    if (navigator.geolocation) {
-                        navigator.geolocation.getCurrentPosition(
-                            function(position) {
-                                spatialData.lat = position.coords.latitude.toFixed(5);
-                                spatialData.lng = position.coords.longitude.toFixed(5);
-                                spatialData.distanceKm = calculateDistance(spatialData.lat, spatialData.lng, BASE_SITE.lat, BASE_SITE.lng);
-                                
-                                document.getElementById('hud-lat').innerText = "LAT: " + spatialData.lat;
-                                document.getElementById('hud-lng').innerText = "LNG: " + spatialData.lng;
-                                
-                                const proxEl = document.getElementById('hud-proximity');
-                                proxEl.innerText = spatialData.distanceKm + " KM";
-                                
-                                // Safe class replacement
-                                proxEl.classList.remove('text-white', 'text-green-400', 'text-yellow-400');
-                                if (parseFloat(spatialData.distanceKm) < 5) {
-                                    proxEl.classList.add('text-green-400');
-                                } else {
-                                    proxEl.classList.add('text-yellow-400');
-                                }
-                            }, 
-                            function(error) {
-                                document.getElementById('hud-lat').innerText = "LAT: DENIED";
-                                document.getElementById('hud-lng').innerText = "LNG: DENIED";
-                                document.getElementById('hud-proximity').innerText = "UNKNOWN";
-                            }, 
-                            { enableHighAccuracy: true, timeout: 5000 }
-                        );
-                    }
-                };
-                reader.readAsDataURL(selectedFile);
+                // FIXED CRASH: Use Object URL instead of FileReader base64!
+                if (currentObjectURL) {
+                    URL.revokeObjectURL(currentObjectURL); // Free memory
+                }
+                currentObjectURL = URL.createObjectURL(selectedFile);
+                imagePreview.src = currentObjectURL;
+                
+                hideElement(uploadSection);
+                showElement(previewSection);
+                hideElement(resultsSection);
+                
+                document.getElementById('hud-time').innerText = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
+                
+                // Start GPS Acquisition (Non-blocking)
+                document.getElementById('hud-lat').innerText = "LAT: ACQUIRING...";
+                document.getElementById('hud-lng').innerText = "LNG: ACQUIRING...";
+                document.getElementById('hud-proximity').innerText = "CALCULATING...";
+                
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            spatialData.lat = position.coords.latitude.toFixed(5);
+                            spatialData.lng = position.coords.longitude.toFixed(5);
+                            spatialData.distanceKm = calculateDistance(spatialData.lat, spatialData.lng, BASE_SITE.lat, BASE_SITE.lng);
+                            
+                            document.getElementById('hud-lat').innerText = "LAT: " + spatialData.lat;
+                            document.getElementById('hud-lng').innerText = "LNG: " + spatialData.lng;
+                            
+                            const proxEl = document.getElementById('hud-proximity');
+                            proxEl.innerText = spatialData.distanceKm + " KM";
+                            proxEl.classList.remove('text-white', 'text-green-400', 'text-yellow-400');
+                            if (parseFloat(spatialData.distanceKm) < 5) {
+                                proxEl.classList.add('text-green-400');
+                            } else {
+                                proxEl.classList.add('text-yellow-400');
+                            }
+                        }, 
+                        function(error) {
+                            console.warn("GPS Error", error);
+                            document.getElementById('hud-lat').innerText = "LAT: N/A";
+                            document.getElementById('hud-lng').innerText = "LNG: N/A";
+                            document.getElementById('hud-proximity').innerText = "NO SIGNAL";
+                        }, 
+                        // Increased timeout to 10 seconds for mobile GPS
+                        { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 }
+                    );
+                }
             }
         });
 
@@ -511,3 +531,6 @@ html
     </script>
 </body>
 </html>
+
+
+```
