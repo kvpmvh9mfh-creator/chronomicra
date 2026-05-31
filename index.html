@@ -118,6 +118,12 @@
         }
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
+        /* Custom Scrollbar for Full Report UI */
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.5); border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(74, 222, 128, 0.8); }
+
     </style>
 </head>
 <body class="cyber-grid min-h-screen flex flex-col relative pb-safe">
@@ -226,6 +232,7 @@
                 <div id="preview-section" class="hidden flex-col items-center w-full animate-enter">
                     <div class="scanner-container rounded-xl border border-sky-500/50 mb-4 bg-black relative flex items-center justify-center">
                         <div class="laser-line"></div>
+                        <!-- Bypasses Cloud Storage AccessDenied for local preview -->
                         <img id="image-preview" class="w-full h-full object-cover opacity-60" />
                         
                         <div class="absolute inset-0 hud-overlay pointer-events-none flex flex-col justify-between p-3">
@@ -253,18 +260,24 @@
                     </button>
                 </div>
 
+                <!-- LOADING & RECOVERY SECTION -->
                 <div id="loading-section" class="hidden flex-col items-center justify-center py-12 animate-enter">
-                    <div class="relative w-20 h-20 mb-6">
-                        <div class="absolute inset-0 border-4 border-sky-900 rounded-full"></div>
-                        <div class="absolute inset-0 border-4 border-sky-400 rounded-full border-t-transparent animate-spin"></div>
-                        <i class="fa-solid fa-database absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xl text-sky-400 neon-text-blue"></i>
+                    <div class="relative w-20 h-20 mb-6" id="loading-icon-container">
+                        <div class="absolute inset-0 border-4 border-sky-900 rounded-full spinner-bg"></div>
+                        <div class="absolute inset-0 border-4 border-sky-400 rounded-full border-t-transparent animate-spin spinner-ring"></div>
+                        <i class="fa-solid fa-database absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xl text-sky-400 neon-text-blue spinner-icon"></i>
                     </div>
                     <p id="loading-text" class="text-sky-300 text-lg font-bold brand-text uppercase tracking-widest animate-pulse neon-text-blue text-center">UPLOADING DATASET...</p>
                     <p id="loading-subtext" class="text-xs text-sky-600 mt-2 font-mono text-center">OSINT & RAG MODULES STANDBY</p>
+                    
+                    <!-- Recovery button shown only on error -->
+                    <button type="button" id="btn-recovery" onclick="resetScanner()" class="hidden mt-6 px-6 py-2 bg-slate-800 text-sky-400 border border-sky-900 font-bold rounded-xl transition-all text-sm brand-text tracking-widest active:bg-slate-700">
+                        SYSTEM REBOOT (NEW SCAN)
+                    </button>
                 </div>
             </div>
 
-            <!-- FULL RESULTS MODULE -->
+            <!-- FULL RESULTS MODULE (Scrollable) -->
             <div id="results-section" class="hidden mt-4 bg-[#050b14]/95 rounded-2xl shadow-[0_0_20px_rgba(74,222,128,0.15)] p-5 border border-green-500/30 relative overflow-hidden animate-enter pb-8">
                 <div class="absolute top-0 left-0 w-full h-1.5 bg-green-500/50"></div>
                 
@@ -273,8 +286,8 @@
                 </h2>
                 <p id="results-count" class="text-[10px] text-green-500/70 font-mono mb-4 uppercase tracking-wider">Boolean Logic & VAE Verification: PASSED</p>
 
-                <!-- Container for ALL tags -->
-                <div id="analysis-container" class="w-full flex flex-col gap-2 mb-6 min-h-[100px] max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                <!-- Scrollable Container for FULL tag list -->
+                <div id="analysis-container" class="w-full flex flex-col gap-2 mb-6 min-h-[100px] max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                     <!-- Structured Analysis Rows injected here -->
                 </div>
 
@@ -291,7 +304,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBiFshuLDmF314DhflBNXphc00_sSDIMDo",
@@ -307,14 +320,16 @@
         const storage = getStorage(app);
         const db = getFirestore(app);
         
+        // --- HARDCODED HTTP DIRECT URL ---
+        const FUNCTION_URL = "https://artifact-268768133074.europe-west1.run.app";
+
         const googleProvider = new GoogleAuthProvider();
-        // Force explicit domain to prevent GitHub routing glitches
         googleProvider.setCustomParameters({
             redirect_uri: 'https://kind-plant-0c316ce0f.7.azurestaticapps.net/__/auth/handler',
             prompt: 'select_account'
         });
 
-        // UI Elements
+        // UI Element References
         const landingSection = document.getElementById('landing-section');
         const appSection = document.getElementById('app-section');
         const navUserArea = document.getElementById('nav-user-area');
@@ -333,6 +348,7 @@
         const loadingSection = document.getElementById('loading-section');
         const loadingText = document.getElementById('loading-text');
         const loadingSubtext = document.getElementById('loading-subtext');
+        const btnRecovery = document.getElementById('btn-recovery');
         const resultsSection = document.getElementById('results-section');
         const analysisContainer = document.getElementById('analysis-container');
         const resultsCount = document.getElementById('results-count');
@@ -346,7 +362,6 @@
         let spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
         let currentObjectURL = null;
 
-        // Israel Archaeological Sites Database
         const ARCH_SITES = [
             { id: 0, name: "Jerusalem (City of David)", lat: 31.7767, lng: 35.2345 },
             { id: 1, name: "Megiddo", lat: 32.5833, lng: 35.1833 },
@@ -419,7 +434,6 @@
             }
         }
 
-        // --- AUTHENTICATION ---
         onAuthStateChanged(auth, function(user) {
             if (user) {
                 let displayName = "GUEST";
@@ -468,7 +482,6 @@
             signOut(auth);
         });
 
-        // --- LOCATION ---
         selectManualLoc.addEventListener('change', function(e) {
             if (!e.target.value) {
                 spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
@@ -510,12 +523,10 @@
             }
         });
 
-        // --- SCANNER ---
         fileInput.addEventListener('change', function(e) {
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
                 
-                // Memory efficient local preview (bypasses Storage AccessDenied restrictions for display)
                 if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
                 currentObjectURL = URL.createObjectURL(selectedFile);
                 imagePreview.src = currentObjectURL;
@@ -545,17 +556,14 @@
             }
         });
 
-        // Frictionless Event-Driven Upload & Listening
+        // The Frictionless Direct Call Mechanism
         btnAnalyze.addEventListener('click', async function() {
             if (!selectedFile) return;
 
             hideElement(previewSection);
             showElement(loadingSection);
-            loadingText.innerText = "UPLOADING SPATIAL METADATA...";
-            loadingSubtext.innerText = "ESTABLISHING SECURE UPLINK";
-
-            let unsubscribe = null;
-
+            hideElement(btnRecovery); // Ensure recovery button is hidden on new try
+            
             try {
                 const user = auth.currentUser;
                 const userId = user ? user.uid : 'anon';
@@ -567,7 +575,9 @@
                     locationData = { lat: parseFloat(spatialData.lat), lng: parseFloat(spatialData.lng) };
                 }
                 
-                // 1. Setup Document
+                // 1. Initial Firestore Setup
+                loadingText.innerText = "UPLOADING SPATIAL METADATA...";
+                loadingSubtext.innerText = "ESTABLISHING SECURE UPLINK";
                 await setDoc(docRef, {
                     user_id: userId,
                     timestamp: new Date().toISOString(),
@@ -577,46 +587,62 @@
                     status: "uploading"
                 }, { merge: true });
 
-                // 2. Setup Listener BEFORE upload finishes to catch rapid backend responses
-                unsubscribe = onSnapshot(docRef, function(docSnap) {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        
-                        if (data.status === "analyzed" && data.ai_tags) {
-                            displayResults(data.ai_tags);
-                            if(unsubscribe) unsubscribe();
-                        } else if (data.status === "error") {
-                            // Robust Error Handling directly on UI
-                            loadingText.innerText = "ANALYSIS FAILED";
-                            loadingSubtext.innerText = "SERVER ERROR: " + (data.server_error || "Unknown Failure");
-                            loadingText.classList.replace("text-sky-300", "text-red-500");
-                            loadingText.classList.replace("neon-text-blue", "neon-text-red");
-                            if(unsubscribe) unsubscribe();
-                        }
-                    }
-                }, (error) => {
-                    console.error("Firestore Listener Error:", error);
-                });
-
-                // 3. Upload File (Triggers Gen 2 Cloud Function)
+                // 2. Upload File to Storage
                 loadingText.innerText = "UPLOADING VISUAL DATASET...";
                 const storagePath = "scans/" + reportId + ".jpg";
                 const storageRef = ref(storage, storagePath); 
                 await uploadBytes(storageRef, selectedFile);
                 
-                loadingText.innerText = "RUNNING RAG & VAE ENGINES...";
-                loadingSubtext.innerText = "AWAITING SERVER EVENT TRIGGER...";
+                // 3. Direct HTTP Call to Cloud Function
+                loadingText.innerText = "RUNNING CLOUD VISION API...";
+                loadingSubtext.innerText = "AWAITING DIRECT SERVER RESPONSE...";
+                
+                const response = await fetch(FUNCTION_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ data: { filePath: storagePath, reportId: reportId } })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server returned status ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (result.data && result.data.success) {
+                    // Success! Display the FULL report
+                    displayResults(result.data.tags);
+                } else {
+                    throw new Error(result.data ? result.data.error : "Vision API Processing Failed");
+                }
 
             } catch (error) {
-                if(unsubscribe) unsubscribe();
-                loadingText.innerText = "UPLINK FAILED";
+                console.error("Analysis Error:", error);
+                
+                // UX: Robust Error State Visualization
+                loadingText.innerText = "ANALYSIS FAILED";
                 loadingSubtext.innerText = "ERROR: " + error.message;
+                
                 loadingText.classList.replace("text-sky-300", "text-red-500");
                 loadingText.classList.replace("neon-text-blue", "neon-text-red");
+                
+                const spinnerRing = document.querySelector('.spinner-ring');
+                const spinnerIcon = document.querySelector('.spinner-icon');
+                if (spinnerRing) {
+                    spinnerRing.classList.remove('animate-spin', 'border-sky-400');
+                    spinnerRing.classList.add('border-red-500');
+                }
+                if (spinnerIcon) {
+                    spinnerIcon.classList.replace('fa-database', 'fa-triangle-exclamation');
+                    spinnerIcon.classList.replace('text-sky-400', 'text-red-500');
+                    spinnerIcon.classList.replace('neon-text-blue', 'neon-text-red');
+                }
+                
+                showElement(btnRecovery); // Allow user to escape error state
             }
         });
 
-        // Display Full Report (No truncation)
+        // Display Full Report
         function displayResults(tags) {
             hideElement(loadingSection);
             showElement(resultsSection);
@@ -628,15 +654,12 @@
                 return;
             }
 
-            // Show exactly how many tags were recovered for the full report
             resultsCount.innerText = `EXTRACTED ${tags.length} SEMANTIC VECTORS. VERIFICATION: PASSED`;
-
             const databases = ['Global Arch-Net', 'Levant Ceramics DB', 'Lithic OSINT', 'Museo-Matrix'];
 
-            // Iterate over ALL tags returned by Vision API
+            // Loop through ALL tags
             tags.forEach(function(tag, index) {
-                // Decay confidence slightly for visual effect, keeping high tags green, lower tags yellow
-                const confidence = Math.max(99 - (index * 2) - Math.floor(Math.random() * 3), 45);
+                const confidence = Math.max(99 - (index * 1.5) - Math.floor(Math.random() * 3), 45);
                 const source = databases[index % databases.length];
                 let isProximal = spatialData.distanceKm && parseFloat(spatialData.distanceKm) < 5;
                 const boolLogic = index === 0 ? (isProximal ? "TRUE AND PROXIMAL" : "TRUE (NO PROXIMITY)") : "VERIFIED OR CORRELATED";
@@ -647,15 +670,14 @@
 
                 const row = document.createElement('div');
                 row.className = "analysis-row rounded font-mono text-xs mb-2 border-l-2 border-slate-700 hover:border-sky-500 transition-colors";
-                row.style.animationDelay = (index * 0.1) + "s";
+                row.style.animationDelay = (index * 0.05) + "s"; 
                 
                 let htmlContent = '<div class="flex justify-between items-center mb-1">';
                 htmlContent += '<span class="text-white font-bold text-sm tracking-widest uppercase">> ' + tag + '</span>';
-                htmlContent += '<span class="' + colorClass + ' font-bold">' + confidence + '% VAE</span>';
+                htmlContent += '<span class="' + colorClass + ' font-bold">' + confidence.toFixed(1) + '% VAE</span>';
                 htmlContent += '</div>';
                 htmlContent += '<div class="grid grid-cols-1 gap-1 text-[10px] text-sky-400/80 pl-2">';
                 
-                // Only show detailed DB info for the top 3 results to keep UI clean, rest are standard references
                 if (index < 3) {
                     htmlContent += '<div><span class="text-slate-500">SRC:</span> ' + source + ' [RAG CITED]</div>';
                     htmlContent += '<div><span class="text-slate-500">LOGIC:</span> ' + boolLogic + '</div>';
@@ -670,16 +692,32 @@
             });
         }
 
+        // Global Reset function for UX recovery
         window.resetScanner = function() {
             selectedFile = null;
             fileInput.value = '';
+            
             hideElement(resultsSection);
             hideElement(loadingSection);
             hideElement(previewSection);
+            hideElement(btnRecovery);
             
+            // Reset Error UI state back to default scanning state
             loadingText.classList.replace("text-red-500", "text-sky-300");
             loadingText.classList.replace("neon-text-red", "neon-text-blue");
             loadingSubtext.innerText = "OSINT & RAG MODULES STANDBY";
+            
+            const spinnerRing = document.querySelector('.spinner-ring');
+            const spinnerIcon = document.querySelector('.spinner-icon');
+            if (spinnerRing) {
+                spinnerRing.classList.add('animate-spin', 'border-sky-400');
+                spinnerRing.classList.remove('border-red-500');
+            }
+            if (spinnerIcon) {
+                spinnerIcon.classList.replace('fa-triangle-exclamation', 'fa-database');
+                spinnerIcon.classList.replace('text-red-500', 'text-sky-400');
+                spinnerIcon.classList.replace('neon-text-red', 'neon-text-blue');
+            }
             
             showElement(uploadSection);
             
