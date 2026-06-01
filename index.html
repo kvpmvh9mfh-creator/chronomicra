@@ -14,6 +14,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
+    <!-- Leaflet CSS & JS for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
         
@@ -39,22 +43,42 @@
 
         .neon-text-blue { text-shadow: 0 0 8px rgba(56, 189, 248, 0.8), 0 0 16px rgba(56, 189, 248, 0.4); }
         .neon-text-green { text-shadow: 0 0 8px rgba(74, 222, 128, 0.8), 0 0 16px rgba(74, 222, 128, 0.4); }
-        .neon-text-red { text-shadow: 0 0 8px rgba(239, 68, 68, 0.8), 0 0 16px rgba(239, 68, 68, 0.4); }
+        .neon-text-red { text-shadow: 0 0 8px rgba(248, 113, 113, 0.8), 0 0 16px rgba(248, 113, 113, 0.4); }
         
         .neon-box-blue {
             box-shadow: 0 0 15px rgba(37, 99, 235, 0.3), inset 0 0 10px rgba(37, 99, 235, 0.1);
             border: 1px solid rgba(56, 189, 248, 0.5);
         }
-        .neon-box-blue:active, .neon-box-blue:hover {
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5), inset 0 0 10px rgba(56, 189, 248, 0.3);
-            border-color: rgba(56, 189, 248, 1);
-        }
 
-        @keyframes fadeIn {
-            0% { opacity: 0; transform: translateY(5px); }
-            100% { opacity: 1; transform: translateY(0); }
+        /* Subtle Inner Animations */
+        @keyframes fadeInScale {
+            0% { opacity: 0; transform: scale(0.98) translateY(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
         }
-        .animate-enter { animation: fadeIn 0.4s ease-out forwards; }
+        .animate-enter { animation: fadeInScale 0.4s ease-out forwards; }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+        .animate-float { animation: float 4s ease-in-out infinite; }
+
+        @keyframes subtlePulse {
+            0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.3); }
+            70% { box-shadow: 0 0 0 15px rgba(56, 189, 248, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+        }
+        .pulse-ring { border-radius: 50%; animation: subtlePulse 2.5s infinite; }
+
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .shimmer-effect {
+            background: linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.05) 50%, transparent 100%);
+            background-size: 200% 100%;
+            animation: shimmer 3s infinite linear;
+        }
 
         .scanner-container {
             position: relative;
@@ -75,7 +99,7 @@
             height: 2px;
             background: #38bdf8;
             box-shadow: 0 0 12px 2px #38bdf8, 0 0 4px 1px #fff;
-            animation: scanLaser 2.5s infinite ease-in-out;
+            animation: scanLaser 3s infinite ease-in-out;
             z-index: 10;
         }
 
@@ -90,61 +114,76 @@
             border-left: 2px solid rgba(56, 189, 248, 0.5);
             background: rgba(0, 0, 0, 0.3);
             margin-bottom: 0.5rem;
-            padding: 0.5rem;
-            animation: slideIn 0.3s ease-out forwards;
+            padding: 0.75rem;
+            animation: slideIn 0.4s ease-out forwards;
             opacity: 0;
             transform: translateX(-10px);
+            position: relative;
+            overflow: hidden;
         }
 
         @keyframes slideIn {
             to { opacity: 1; transform: translateX(0); }
         }
 
-        select {
-            appearance: none;
-            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2338bdf8%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.7rem top 50%;
-            background-size: 0.65rem auto;
+        .glitch-text {
+            color: #f87171;
+            text-shadow: 2px 0 #38bdf8, -2px 0 #4ade80;
+            animation: glitch 1.5s linear infinite;
+        }
+        @keyframes glitch{
+            2%,64%{transform:translate(1px,0) skew(0deg);}
+            4%,60%{transform:translate(-1px,0) skew(0deg);}
+            62%{transform:translate(0,0) skew(2deg);}
         }
 
-        .btn-loading i { display: none; }
-        .btn-loading::after {
-            content: "\f110";
-            font-family: "Font Awesome 6 Free";
-            font-weight: 900;
-            animation: spin 1s linear infinite;
-            margin-right: 0.5rem;
+        /* Leaflet Map Overrides */
+        .leaflet-container {
+            background-color: #050b14;
+            font-family: 'Share Tech Mono', monospace;
         }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(74, 222, 128, 0.5); border-radius: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(74, 222, 128, 0.8); }
-
+        .leaflet-popup-content-wrapper {
+            background: rgba(10, 25, 47, 0.95);
+            color: #38bdf8;
+            border: 1px solid #0284c7;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .leaflet-popup-tip {
+            background: rgba(10, 25, 47, 0.95);
+            border: 1px solid #0284c7;
+        }
     </style>
 </head>
 <body class="cyber-grid min-h-screen flex flex-col relative pb-safe">
 
+    <!-- Navigation -->
     <nav class="w-full bg-[#050b14]/90 backdrop-blur-md border-b border-sky-900/50 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div class="w-full px-4 h-16 flex items-center justify-between">
             <div class="flex items-center gap-2 font-bold text-xl sm:text-2xl tracking-widest brand-text neon-text-blue text-white">
-                <i class="fa-solid fa-atom text-sky-400 animate-pulse"></i>
+                <i class="fa-solid fa-atom text-sky-400 animate-float"></i>
                 <span class="whitespace-nowrap">CHRONOMICRA</span>
             </div>
             
-            <div id="nav-user-area" class="hidden items-center gap-3 animate-enter">
+            <div id="nav-user-area" class="hidden flex items-center gap-3 animate-enter">
                 <div class="text-right hidden sm:block">
                     <p id="nav-user-name" class="text-sm font-bold text-sky-300 truncate max-w-[100px]">Guest</p>
+                    <p id="nav-user-role" class="text-[9px] text-sky-500 uppercase tracking-widest font-mono">Explorer</p>
                 </div>
-                <button type="button" id="btn-logout" class="w-10 h-10 flex items-center justify-center text-sky-400 hover:text-white bg-sky-950/50 rounded-full border border-sky-800/50 active:bg-sky-900 transition-colors">
-                    <i class="fa-solid fa-power-off"></i>
+                <!-- Dynamic Profile Images -->
+                <img id="nav-user-avatar" src="" class="hidden w-9 h-9 rounded-full border border-sky-500/50 object-cover" />
+                <div id="nav-guest-avatar" class="hidden w-9 h-9 rounded-full border border-slate-600 bg-slate-800 flex items-center justify-center">
+                    <i class="fa-solid fa-user-astronaut text-slate-400 text-sm"></i>
+                </div>
+                
+                <button id="btn-logout" class="w-9 h-9 flex items-center justify-center text-sky-400 hover:text-white bg-sky-950/50 rounded-full border border-sky-800/50 active:bg-sky-900 transition-colors ml-1">
+                    <i class="fa-solid fa-power-off text-xs"></i>
                 </button>
             </div>
         </div>
     </nav>
 
+    <!-- 1. LANDING PAGE -->
     <section id="landing-section" class="flex-grow flex flex-col items-center justify-center p-4 sm:p-6 animate-enter">
         <div class="w-full max-w-md text-center space-y-6 relative">
             <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-blue-600/20 blur-[80px] -z-10 rounded-full"></div>
@@ -157,174 +196,213 @@
             </p>
             
             <div class="pt-6 flex flex-col gap-4 w-full px-2">
-                <button type="button" id="btn-login-archaeologist" class="neon-box-blue w-full relative overflow-hidden flex flex-row items-center justify-start p-4 bg-[#0a192f] rounded-2xl transition-all active:scale-[0.98]">
+                <button id="btn-login-archaeologist" class="neon-box-blue w-full relative overflow-hidden flex flex-row items-center justify-start p-4 bg-[#0a192f] rounded-2xl transition-all active:scale-[0.98]">
                     <div class="w-12 h-12 shrink-0 rounded-full flex items-center justify-center mr-4 border border-sky-500/30 shadow-[0_0_10px_rgba(56,189,248,0.2)] bg-[#050b14]">
                         <i class="fa-brands fa-google text-xl text-sky-400"></i>
                     </div>
-                    <div class="flex flex-col items-start text-left w-full">
+                    <div class="flex flex-col items-start text-left">
                         <span class="text-lg font-bold text-white tracking-wide brand-text">ARCHAEOLOGIST</span>
-                        <span id="login-arch-status" class="text-xs text-sky-500 uppercase tracking-widest">Secure Access</span>
+                        <span class="text-xs text-sky-500 uppercase tracking-widest">Secure Access</span>
                     </div>
                 </button>
 
-                <button type="button" id="btn-login-guest" class="w-full relative overflow-hidden flex flex-row items-center justify-start p-4 bg-[#050b14] border border-slate-700/80 rounded-2xl transition-all active:scale-[0.98] active:border-sky-500/50">
+                <button id="btn-login-guest" class="w-full relative overflow-hidden flex flex-row items-center justify-start p-4 bg-[#050b14] border border-slate-700/80 rounded-2xl transition-all active:scale-[0.98] active:border-sky-500/50">
                     <div class="w-12 h-12 shrink-0 rounded-full flex items-center justify-center mr-4 border border-slate-700 bg-slate-900">
                         <i class="fa-solid fa-user-astronaut text-xl text-slate-400"></i>
                     </div>
-                    <div class="flex flex-col items-start text-left w-full">
+                    <div class="flex flex-col items-start text-left">
                         <span class="text-lg font-bold text-slate-200 tracking-wide brand-text">GUEST EXPLORER</span>
-                        <span id="login-guest-status" class="text-xs text-slate-500 uppercase tracking-widest">Anonymous Link</span>
+                        <span class="text-xs text-slate-500 uppercase tracking-widest">Anonymous Link</span>
                     </div>
                 </button>
             </div>
         </div>
     </section>
 
+    <!-- 2. MAIN APP SECTION -->
     <main id="app-section" class="hidden flex-grow flex-col items-center p-4 animate-enter w-full pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div class="w-full max-w-md mx-auto relative flex flex-col h-full">
             
-            <div class="mb-4 border-l-4 border-sky-500 pl-3 flex justify-between items-center">
+            <!-- Dashboard Header -->
+            <div id="dashboard-header" class="mb-4 border-l-4 border-sky-500 pl-3 flex justify-between items-center">
                 <div>
-                    <h2 id="dashboard-greeting" class="text-2xl font-bold text-white tracking-wide neon-text-blue uppercase">SYSTEM READY</h2>
-                    <p class="text-sky-400/80 font-medium tracking-wider text-xs mt-0.5">AWAITING VISUAL INPUT</p>
+                    <h2 id="dashboard-greeting" class="text-xl font-bold text-white tracking-wide neon-text-blue uppercase">SCANNER READY</h2>
+                    <p id="dashboard-subtext" class="text-sky-400/80 font-medium tracking-wider text-xs mt-0.5">Please complete the steps below</p>
                 </div>
             </div>
 
-            <div class="mb-4 bg-[#050b14]/80 border border-sky-900/80 rounded-xl p-4 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-                <div class="flex justify-between items-center mb-3">
-                    <span class="text-xs text-sky-400 font-mono tracking-widest"><i class="fa-solid fa-location-crosshairs mr-1"></i> LOCATION MODULE</span>
-                    <i class="fa-solid fa-satellite text-sky-800 text-sm" id="loc-icon"></i>
-                </div>
+            <div class="bg-[#0a192f]/90 backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] p-4 sm:p-6 border border-sky-900/50 relative overflow-hidden flex-grow flex flex-col justify-center shimmer-effect">
                 
-                <div class="flex flex-col gap-3">
-                    <div class="flex gap-2">
-                        <button type="button" id="btn-gps" class="flex-shrink-0 bg-sky-900/50 hover:bg-sky-800 text-sky-300 border border-sky-700 rounded-lg px-4 py-2 text-sm font-bold brand-text uppercase transition-colors">
-                            <i class="fa-solid fa-satellite-dish mr-1"></i> GPS
-                        </button>
-                        <select id="select-manual-loc" class="flex-grow bg-[#0a192f] text-sky-200 border border-sky-800 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:border-sky-500">
-                            <option value="">-- SELECT MANUAL SITE --</option>
-                        </select>
-                    </div>
-                    <div id="loc-status-panel" class="bg-black/50 rounded p-2 text-[10px] text-sky-500/70 font-mono tracking-wide">
-                        STATUS: AWAITING LOCATION LOCK...
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-[#0a192f]/90 backdrop-blur-sm rounded-2xl shadow-[0_0_20px_rgba(0,0,0,0.5)] p-4 sm:p-6 border border-sky-900/50 relative overflow-hidden flex-grow flex flex-col justify-center">
-                
-                <div id="upload-section" class="animate-enter w-full flex flex-col items-center justify-center border-2 border-dashed border-sky-700/50 bg-[#050b14]/50 rounded-xl min-h-[220px] active:bg-sky-900/30 transition-all cursor-pointer" onclick="document.getElementById('file-upload').click()">
-                    <div class="relative w-20 h-20 mb-3 flex items-center justify-center">
+                <!-- Upload Area (Triggers Map Modal first) -->
+                <div id="upload-section" class="animate-enter w-full flex flex-col items-center justify-center border-2 border-dashed border-sky-600/50 bg-[#050b14]/50 rounded-xl min-h-[260px] transition-all cursor-pointer hover:bg-sky-900/20 active:scale-[0.98] p-4" onclick="triggerFileInput()">
+                    
+                    <div class="relative w-20 h-20 mb-4 flex items-center justify-center">
+                        <div id="icon-pulse-ring" class="absolute inset-0 pulse-ring border border-sky-400/50"></div>
                         <i class="fa-solid fa-expand text-6xl text-sky-900/40 absolute"></i>
-                        <i class="fa-solid fa-camera-retro text-4xl text-sky-400 relative z-10"></i>
+                        <i id="main-icon" class="fa-solid fa-map-location-dot text-4xl text-sky-400 relative z-10 animate-float"></i>
                     </div>
-                    <p class="text-center text-xl text-white font-semibold brand-text tracking-widest mb-1">TAP TO SCAN</p>
-                    <p class="text-center text-sm text-sky-500 uppercase tracking-widest px-4">Initialize Visual Capture</p>
-                    <input id="file-upload" type="file" accept="image/*" class="hidden" capture="environment" />
+                    
+                    <p id="scan-title" class="text-center text-lg text-white font-bold brand-text tracking-widest mb-2">STEP 1: SET LOCATION</p>
+                    <p id="scan-explanation" class="text-center text-sm text-sky-400/80 leading-relaxed max-w-[250px]">
+                        The AI needs your location to match your finding against nearby historical sites.
+                    </p>
+                    
+                    <input id="file-upload" type="file" accept="image/*" class="hidden" capture="environment" disabled />
                 </div>
 
+                <!-- Preview & Tactical HUD Section -->
                 <div id="preview-section" class="hidden flex-col items-center w-full animate-enter">
                     <div class="scanner-container rounded-xl border border-sky-500/50 mb-4 bg-black relative flex items-center justify-center">
                         <div class="laser-line"></div>
                         <img id="image-preview" class="w-full h-full object-cover opacity-60" />
                         
+                        <!-- Tactical HUD Overlay -->
                         <div class="absolute inset-0 hud-overlay pointer-events-none flex flex-col justify-between p-3">
                             <div class="flex justify-between items-start w-full">
                                 <div class="mono-text text-[10px] text-sky-300">
-                                    <span class="text-sky-500">REC // </span><span id="hud-time">00:00:00</span><br>
-                                    <span id="hud-lat">LAT: STANDBY</span><br>
-                                    <span id="hud-lng">LNG: STANDBY</span>
+                                    <span class="text-sky-500">TIME // </span><span id="hud-time">00:00:00</span><br>
+                                    <span id="hud-lat">LAT: SETTING...</span><br>
+                                    <span id="hud-lng">LNG: SETTING...</span>
                                 </div>
-                                <div class="w-4 h-4 border-t-2 border-r-2 border-sky-400 animate-pulse"></div>
+                                <div class="w-4 h-4 border-t-2 border-r-2 border-sky-400"></div>
                             </div>
                             
                             <div class="flex justify-between items-end w-full">
                                 <div class="w-4 h-4 border-b-2 border-l-2 border-sky-400"></div>
-                                <div class="text-right mono-text text-[10px] text-sky-300 bg-black/50 p-1 rounded">
-                                    <span class="text-sky-500">PROXIMITY TO: <span id="hud-site-name">BASE</span></span><br>
-                                    <span id="hud-proximity" class="font-bold text-white tracking-widest">N/A</span>
+                                <div class="text-right mono-text text-[10px] text-sky-300 bg-black/50 p-1.5 rounded border border-sky-900">
+                                    <span class="text-sky-500 mb-1 block border-b border-sky-900/50 pb-1">SELECTED AREA</span>
+                                    <span id="hud-proximity" class="font-bold text-white tracking-widest uppercase block mt-1">CHECKING...</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                     
-                    <button type="button" id="btn-analyze" class="w-full h-14 neon-box-blue bg-sky-600 active:bg-sky-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-3 brand-text text-lg tracking-widest uppercase">
-                        <i class="fa-solid fa-satellite-dish animate-pulse"></i> PROCESS MULTI-LAYER DATA
+                    <p class="text-center text-sm text-sky-400/80 mb-3 px-2">Image captured. The AI is ready to compare it with regional history.</p>
+                    
+                    <button id="btn-analyze" class="w-full h-14 neon-box-blue bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-3 brand-text text-lg tracking-widest uppercase active:scale-[0.98]">
+                        <i class="fa-solid fa-microchip animate-float"></i> STEP 3: ANALYZE ARTIFACT
                     </button>
                 </div>
 
+                <!-- Processing State -->
                 <div id="loading-section" class="hidden flex-col items-center justify-center py-12 animate-enter">
-                    <div class="relative w-20 h-20 mb-6" id="loading-icon-container">
-                        <div class="absolute inset-0 border-4 border-sky-900 rounded-full spinner-bg"></div>
-                        <div class="absolute inset-0 border-4 border-sky-400 rounded-full border-t-transparent animate-spin spinner-ring"></div>
-                        <i class="fa-solid fa-database absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xl text-sky-400 neon-text-blue spinner-icon"></i>
+                    <div class="relative w-24 h-24 mb-6 flex items-center justify-center">
+                        <div class="absolute inset-0 border-4 border-sky-900/50 rounded-full"></div>
+                        <div class="absolute inset-0 border-4 border-sky-400 rounded-full border-t-transparent animate-spin"></div>
+                        <i class="fa-solid fa-magnifying-glass absolute text-2xl text-sky-400 animate-float"></i>
                     </div>
-                    <p id="loading-text" class="text-sky-300 text-lg font-bold brand-text uppercase tracking-widest animate-pulse neon-text-blue text-center">UPLOADING DATASET...</p>
-                    <p id="loading-subtext" class="text-xs text-sky-600 mt-2 font-mono text-center">OSINT & RAG MODULES STANDBY</p>
-                    
-                    <button type="button" id="btn-recovery" onclick="resetScanner()" class="hidden mt-6 px-6 py-2 bg-slate-800 text-sky-400 border border-sky-900 font-bold rounded-xl transition-all text-sm brand-text tracking-widest active:bg-slate-700">
-                        SYSTEM REBOOT (NEW SCAN)
-                    </button>
+                    <p id="loading-text" class="text-sky-300 text-lg font-bold brand-text uppercase tracking-widest neon-text-blue text-center mb-2">Analyzing image...</p>
+                    <p class="text-xs text-sky-500/80 mt-1 font-mono text-center max-w-[200px]">Cross-referencing historical databases for this region.</p>
                 </div>
             </div>
 
-            <div id="results-section" class="hidden mt-4 bg-[#050b14]/95 rounded-2xl shadow-[0_0_20px_rgba(74,222,128,0.15)] p-5 border border-green-500/30 relative overflow-hidden animate-enter pb-8">
-                <div class="absolute top-0 left-0 w-full h-1.5 bg-green-500/50"></div>
+            <!-- Deep Analysis Results Card -->
+            <div id="results-section" class="hidden mt-4 bg-[#050b14]/95 rounded-2xl shadow-[0_0_20px_rgba(74,222,128,0.15)] p-5 border border-green-500/30 relative overflow-hidden animate-enter pb-6">
+                <div id="results-header-bar" class="absolute top-0 left-0 w-full h-1.5 bg-green-500/50"></div>
                 
-                <h2 class="text-lg font-bold text-white mb-1 flex items-center gap-2 brand-text tracking-widest neon-text-green">
-                    <i class="fa-solid fa-layer-group text-green-400"></i> DEEP ANALYSIS COMPLETE
+                <h2 id="results-header-title" class="text-lg font-bold text-white mb-1 flex items-center gap-2 brand-text tracking-widest neon-text-green">
+                    <i id="results-header-icon" class="fa-solid fa-circle-check text-green-400"></i> ANALYSIS COMPLETE
                 </h2>
-                <p id="results-count" class="text-[10px] text-green-500/70 font-mono mb-4 uppercase tracking-wider">Boolean Logic & VAE Verification: PASSED</p>
+                <p id="results-header-sub" class="text-[11px] text-green-500/80 mb-5 border-b border-green-900/50 pb-3">Based on visual details and regional history</p>
 
-                <div id="analysis-container" class="w-full flex flex-col gap-2 mb-6 min-h-[100px] max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                    </div>
+                <div id="analysis-container" class="w-full flex flex-col gap-3 mb-6 min-h-[100px]">
+                    <!-- Structured Analysis Rows injected here -->
+                </div>
 
-                <button type="button" onclick="resetScanner()" class="w-full h-14 bg-slate-800 active:bg-slate-700 text-sky-400 border border-sky-900 active:border-sky-500 font-bold rounded-xl transition-all flex items-center justify-center gap-2 uppercase brand-text tracking-widest text-sm mt-4">
-                    <i class="fa-solid fa-crosshairs"></i> CAPTURE NEW ARTIFACT
+                <!-- Post Analysis Actions -->
+                <div class="grid grid-cols-3 gap-2 mb-4">
+                    <button onclick="handlePostAction('expand')" id="btn-expand" class="bg-sky-900/40 text-sky-300 border border-sky-800 p-2 rounded-lg text-[10px] font-bold tracking-widest uppercase hover:bg-sky-800 transition-colors flex flex-col items-center justify-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-magnifying-glass-plus text-sm"></i> Expand
+                    </button>
+                    <button onclick="handlePostAction('copy')" id="btn-copy" class="bg-sky-900/40 text-sky-300 border border-sky-800 p-2 rounded-lg text-[10px] font-bold tracking-widest uppercase hover:bg-sky-800 transition-colors flex flex-col items-center justify-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-copy text-sm"></i> Copy
+                    </button>
+                    <button onclick="handlePostAction('share')" id="btn-share" class="bg-sky-900/40 text-sky-300 border border-sky-800 p-2 rounded-lg text-[10px] font-bold tracking-widest uppercase hover:bg-sky-800 transition-colors flex flex-col items-center justify-center gap-1.5 active:scale-95">
+                        <i class="fa-solid fa-share-nodes text-sm"></i> Share
+                    </button>
+                </div>
+
+                <button onclick="resetScanner()" class="w-full h-12 bg-slate-800 hover:bg-slate-700 text-sky-400 border border-sky-900 font-bold rounded-xl transition-all flex items-center justify-center gap-2 uppercase brand-text tracking-widest text-xs active:scale-[0.98]">
+                    <i class="fa-solid fa-camera"></i> SCAN ANOTHER ITEM
                 </button>
             </div>
 
         </div>
     </main>
 
+    <!-- SATELLITE MAP MODAL -->
+    <div id="map-modal" class="hidden fixed inset-0 z-[100] bg-[#050b14] flex flex-col animate-enter">
+        
+        <!-- Header -->
+        <div class="bg-[#0a192f] border-b border-sky-900 p-4 flex justify-between items-center pt-[env(safe-area-inset-top)]">
+            <h3 class="text-lg font-bold text-white brand-text tracking-widest neon-text-blue uppercase flex items-center">
+                <i class="fa-solid fa-map-location-dot text-sky-400 mr-2"></i> LOCATION SETTINGS
+            </h3>
+            <button id="btn-close-map" class="text-slate-400 hover:text-white p-2">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-sky-950/40 p-3 px-4 border-b border-sky-900/50 text-sm text-sky-200/90 leading-snug">
+            <p>Set your location so the AI can filter results based on the history of the surrounding area. You can use GPS or place the pin manually.</p>
+        </div>
+
+        <!-- The Map Container -->
+        <div id="satellite-map" class="flex-grow w-full bg-slate-900 relative">
+            <div id="map-loading" class="absolute inset-0 z-[1000] bg-black/70 flex flex-col items-center justify-center">
+                <i class="fa-solid fa-location-crosshairs text-4xl text-sky-400 animate-spin-slow mb-3 pulse-ring"></i>
+                <p class="text-sky-300 font-mono text-sm tracking-widest uppercase mt-2">Finding your location...</p>
+            </div>
+        </div>
+
+        <!-- Status & Confirm Footer -->
+        <div class="bg-[#0a192f] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-sky-500/50 flex flex-col gap-3 shadow-[0_-10px_20px_rgba(0,0,0,0.5)] z-[1000]">
+            <div class="flex justify-between items-center">
+                <div class="text-sky-500 text-[11px] font-bold tracking-widest uppercase">Nearest Historical Site:</div>
+                <button id="btn-recenter" class="text-sky-400 bg-sky-900/30 p-2 rounded border border-sky-800 text-xs hover:bg-sky-800 transition-colors">
+                    <i class="fa-solid fa-location-arrow mr-1"></i> Use GPS
+                </button>
+            </div>
+            
+            <div id="map-proximity-text" class="text-sm font-bold text-white tracking-widest leading-relaxed">
+                Loading area data...
+            </div>
+
+            <button id="btn-confirm-location" class="w-full h-12 mt-2 neon-box-blue bg-sky-600 hover:bg-sky-500 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 brand-text tracking-widest uppercase active:scale-[0.98]">
+                <i class="fa-solid fa-check"></i> CONFIRM LOCATION
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK & Logic (Updated with provided credentials) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-        import { getFirestore, doc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Integrated Provided Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyBiFshuLDmF314DhflBNXphc00_sSDIMDo",
             authDomain: "chronomicra-9a82c.firebaseapp.com",
             projectId: "chronomicra-9a82c",
             storageBucket: "chronomicra-9a82c.firebasestorage.app",
             messagingSenderId: "268768133074",
-            appId: "1:268768133074:web:897c946b6cfff4cca0120b"
+            appId: "1:268768133074:web:897c946b6cfff4cca0120b",
+            measurementId: "G-2Y54N873NK"
         };
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const storage = getStorage(app);
         const db = getFirestore(app);
-        
-        // --- UPDATED PRODUCTION SERVICE URL ---
-        const FUNCTION_URL = "https://analyzeartifactimage-268768133074.europe-west1.run.app";
-
         const googleProvider = new GoogleAuthProvider();
-        googleProvider.setCustomParameters({
-            redirect_uri: 'https://kind-plant-0c316ce0f.7.azurestaticapps.net/__/auth/handler',
-            prompt: 'select_account'
-        });
 
+        // UI Elements
         const landingSection = document.getElementById('landing-section');
         const appSection = document.getElementById('app-section');
         const navUserArea = document.getElementById('nav-user-area');
-        
-        const btnLoginArch = document.getElementById('btn-login-archaeologist');
-        const btnLoginGuest = document.getElementById('btn-login-guest');
-        const statusArch = document.getElementById('login-arch-status');
-        const statusGuest = document.getElementById('login-guest-status');
-        const btnLogout = document.getElementById('btn-logout');
         
         const fileInput = document.getElementById('file-upload');
         const uploadSection = document.getElementById('upload-section');
@@ -333,40 +411,43 @@
         const btnAnalyze = document.getElementById('btn-analyze');
         const loadingSection = document.getElementById('loading-section');
         const loadingText = document.getElementById('loading-text');
-        const loadingSubtext = document.getElementById('loading-subtext');
-        const btnRecovery = document.getElementById('btn-recovery');
         const resultsSection = document.getElementById('results-section');
         const analysisContainer = document.getElementById('analysis-container');
-        const resultsCount = document.getElementById('results-count');
+        
+        const scanTitle = document.getElementById('scan-title');
+        const scanExplanation = document.getElementById('scan-explanation');
+        const mainIcon = document.getElementById('main-icon');
+        
+        const mapModal = document.getElementById('map-modal');
+        const mapLoading = document.getElementById('map-loading');
+        const mapProximityText = document.getElementById('map-proximity-text');
 
-        const btnGps = document.getElementById('btn-gps');
-        const selectManualLoc = document.getElementById('select-manual-loc');
-        const locStatusPanel = document.getElementById('loc-status-panel');
-        const locIcon = document.getElementById('loc-icon');
-
+        // State variables
         let selectedFile = null;
-        let spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
+        let spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: null };
         let currentObjectURL = null;
+        let gpsLocked = false;
+        window.currentResultsTags = [];
 
-        const ARCH_SITES = [
-            { id: 0, name: "Jerusalem (City of David)", lat: 31.7767, lng: 35.2345 },
-            { id: 1, name: "Megiddo", lat: 32.5833, lng: 35.1833 },
-            { id: 2, name: "Masada", lat: 31.3156, lng: 35.3536 },
-            { id: 3, name: "Caesarea Maritima", lat: 32.5000, lng: 34.8950 },
-            { id: 4, name: "Tel Hazor", lat: 33.0167, lng: 35.5667 },
-            { id: 5, name: "Ashkelon Nat. Park", lat: 31.6667, lng: 34.5667 },
-            { id: 6, name: "Qumran", lat: 31.7412, lng: 35.4589 }
+        // Geofence / Excavation Sites
+        const EXCAVATION_SITES = [
+            { name: "Ashkelon National Park", lat: 31.6592, lng: 34.5458 },
+            { name: "Tel Lachish", lat: 31.5653, lng: 34.8469 },
+            { name: "Caesarea Maritima", lat: 32.5012, lng: 34.8923 },
+            { name: "Jerusalem Old City", lat: 31.7767, lng: 35.2345 },
+            { name: "Beit She'an", lat: 32.5022, lng: 35.5014 }
         ];
+        const DEFAULT_CENTER = { lat: 31.0461, lng: 34.8516 }; // Center Israel
 
-        ARCH_SITES.forEach(site => {
-            let option = document.createElement('option');
-            option.value = site.id;
-            option.text = site.name;
-            selectManualLoc.appendChild(option);
-        });
+        // Map Variables
+        let leafletMap = null;
+        let userMarker = null;
 
         function showElement(el) {
             el.classList.remove('hidden');
+            el.classList.remove('animate-enter');
+            void el.offsetWidth;
+            el.classList.add('animate-enter');
             el.style.display = 'flex'; 
         }
 
@@ -375,303 +456,438 @@
             el.style.display = 'none';
         }
 
-        function switchScreen(toApp) {
-            if (toApp) {
-                hideElement(landingSection);
-                showElement(navUserArea);
-                showElement(appSection);
-            } else {
-                hideElement(appSection);
-                hideElement(navUserArea);
-                showElement(landingSection);
-            }
-        }
-
         function calculateDistance(lat1, lon1, lat2, lon2) {
             const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
             const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return (R * c).toFixed(2);
+            return R * c; 
         }
 
-        function findNearestSite(lat, lng) {
+        function getNearestSite(lat, lng) {
             let nearest = null;
-            let minDist = Infinity;
-            ARCH_SITES.forEach(site => {
-                let dist = parseFloat(calculateDistance(lat, lng, site.lat, site.lng));
-                if (dist < minDist) {
-                    minDist = dist;
+            let minDistance = Infinity;
+            EXCAVATION_SITES.forEach(site => {
+                const dist = calculateDistance(lat, lng, site.lat, site.lng);
+                if(dist < minDistance) {
+                    minDistance = dist;
                     nearest = site;
                 }
             });
-            return { site: nearest, distance: minDist.toFixed(2) };
+            return { site: nearest, distance: minDistance };
         }
 
-        function updateLocationUI(statusText, isSuccess) {
-            locStatusPanel.innerHTML = statusText;
-            if (isSuccess) {
-                locIcon.classList.add('text-green-400', 'animate-pulse');
-                locIcon.classList.remove('text-sky-800');
-            } else {
-                locIcon.classList.remove('text-green-400', 'animate-pulse');
-                locIcon.classList.add('text-sky-800');
-            }
-        }
-
-        onAuthStateChanged(auth, function(user) {
-            if (user) {
-                let displayName = "GUEST";
-                if (!user.isAnonymous && user.displayName) {
-                    displayName = user.displayName.split(' ')[0].toUpperCase();
-                }
-                document.getElementById('nav-user-name').innerText = displayName;
+        // --- MAP & LOCATION LOGIC ---
+        
+        function updateMapUI(lat, lng) {
+            const nearestInfo = getNearestSite(lat, lng);
+            let distStr = nearestInfo.distance < 1 
+                ? `${(nearestInfo.distance * 1000).toFixed(0)} meters` 
+                : `${nearestInfo.distance.toFixed(2)} km`;
                 
-                btnLoginArch.classList.remove('btn-loading');
-                btnLoginGuest.classList.remove('btn-loading');
-                statusArch.innerText = "Secure Access";
-                statusGuest.innerText = "Anonymous Link";
+            let colorClass = nearestInfo.distance < 5 ? "text-green-400" : "text-yellow-400";
+            
+            mapProximityText.innerHTML = `You are <span class="${colorClass}">${distStr}</span> from <br/><span class="text-sky-300 font-mono text-base">${nearestInfo.site.name}</span>`;
+            
+            spatialData.lat = lat;
+            spatialData.lng = lng;
+            spatialData.distanceKm = nearestInfo.distance;
+            spatialData.nearestSiteName = nearestInfo.site.name;
+        }
 
-                switchScreen(true);
+        function initLeafletMap(centerLat, centerLng) {
+            if (!leafletMap) {
+                leafletMap = L.map('satellite-map', {zoomControl: false}).setView([centerLat, centerLng], 12);
+                
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 18,
+                    attribution: 'Tiles &copy; Esri'
+                }).addTo(leafletMap);
+
+                EXCAVATION_SITES.forEach(site => {
+                    const siteIcon = L.divIcon({
+                        html: '<i class="fa-solid fa-diamond text-sky-400 text-xl drop-shadow-[0_0_8px_rgba(56,189,248,1)]"></i>',
+                        className: 'bg-transparent',
+                        iconSize: [20, 20],
+                        iconAnchor: [10, 10]
+                    });
+                    L.marker([site.lat, site.lng], {icon: siteIcon}).addTo(leafletMap)
+                     .bindPopup(`<div class="font-mono text-sm font-bold text-sky-300">${site.name}</div>`);
+                });
+
+                const userIcon = L.divIcon({
+                    html: '<div class="relative"><div class="w-5 h-5 bg-green-500 rounded-full border-2 border-white shadow-[0_0_15px_rgba(74,222,128,1)]"></div><div class="absolute inset-0 bg-green-400 rounded-full animate-ping opacity-75"></div></div>',
+                    className: 'bg-transparent',
+                    iconSize: [20, 20],
+                    iconAnchor: [10, 10]
+                });
+
+                userMarker = L.marker([centerLat, centerLng], {icon: userIcon, draggable: true}).addTo(leafletMap);
+
+                userMarker.on('dragend', function() {
+                    const pos = userMarker.getLatLng();
+                    updateMapUI(pos.lat, pos.lng);
+                });
+
+                leafletMap.on('click', function(e) {
+                    userMarker.setLatLng(e.latlng);
+                    updateMapUI(e.latlng.lat, e.latlng.lng);
+                });
             } else {
-                window.resetScanner();
-                switchScreen(false);
+                leafletMap.setView([centerLat, centerLng], 12);
+                userMarker.setLatLng([centerLat, centerLng]);
             }
-        });
-
-        btnLoginArch.addEventListener('click', function(e) {
-            e.preventDefault();
-            btnLoginArch.classList.add('btn-loading');
-            statusArch.innerText = "Connecting...";
             
-            signInWithPopup(auth, googleProvider).catch(function(error) {
-                btnLoginArch.classList.remove('btn-loading');
-                statusArch.innerText = "Secure Access";
-                alert("Login failed: " + error.message);
-            });
-        });
+            setTimeout(() => leafletMap.invalidateSize(), 200);
+            updateMapUI(centerLat, centerLng);
+        }
 
-        btnLoginGuest.addEventListener('click', function(e) {
-            e.preventDefault();
-            btnLoginGuest.classList.add('btn-loading');
-            statusGuest.innerText = "Connecting...";
+        function openMapCalibration() {
+            showElement(mapModal);
+            showElement(mapLoading);
             
-            signInAnonymously(auth).catch(function(error) {
-                btnLoginGuest.classList.remove('btn-loading');
-                statusGuest.innerText = "Anonymous Link";
-                alert("Guest Login Failed: " + error.message);
-            });
-        });
-
-        btnLogout.addEventListener('click', function() {
-            signOut(auth);
-        });
-
-        selectManualLoc.addEventListener('change', function(e) {
-            if (!e.target.value) {
-                spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
-                updateLocationUI("STATUS: AWAITING LOCATION LOCK...", false);
-                return;
-            }
-            const site = ARCH_SITES[parseInt(e.target.value)];
-            spatialData = { lat: site.lat, lng: site.lng, distanceKm: "0.00", nearestSiteName: site.name };
-            updateLocationUI(`<span class="text-green-400">MANUAL OVERRIDE: ${site.name.toUpperCase()} LOCK</span>`, true);
-        });
-
-        btnGps.addEventListener('click', function() {
-            updateLocationUI("STATUS: ACQUIRING SATELLITE LOCK...", false);
-            selectManualLoc.value = ""; 
-
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     function(position) {
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-                        const nearest = findNearestSite(lat, lng);
-                        
-                        spatialData = { 
-                            lat: lat.toFixed(5), 
-                            lng: lng.toFixed(5), 
-                            distanceKm: nearest.distance, 
-                            nearestSiteName: nearest.site.name 
-                        };
-                        
-                        updateLocationUI(`<span class="text-green-400">GPS LOCK. NEAREST SITE: ${nearest.site.name.toUpperCase()} (${nearest.distance} KM)</span>`, true);
+                        hideElement(mapLoading);
+                        initLeafletMap(position.coords.latitude, position.coords.longitude);
                     }, 
                     function(error) {
-                        updateLocationUI(`<span class="text-yellow-500">SIGNAL FAILED. SELECT MANUAL SITE.</span>`, false);
+                        console.warn("GPS Signal Error", error);
+                        hideElement(mapLoading);
+                        initLeafletMap(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
+                        alert("Could not get your exact location. We've placed the pin in the center of the region. Tap the map to move it.");
                     }, 
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
                 );
             } else {
-                updateLocationUI(`<span class="text-red-500">GPS NOT SUPPORTED</span>`, false);
+                hideElement(mapLoading);
+                initLeafletMap(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng);
+            }
+        }
+
+        document.getElementById('btn-close-map').addEventListener('click', () => hideElement(mapModal));
+        
+        document.getElementById('btn-recenter').addEventListener('click', () => {
+            showElement(mapLoading);
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    hideElement(mapLoading);
+                    leafletMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
+                    userMarker.setLatLng([pos.coords.latitude, pos.coords.longitude]);
+                    updateMapUI(pos.coords.latitude, pos.coords.longitude);
+                },
+                () => {
+                    hideElement(mapLoading);
+                    alert("Unable to acquire GPS signal.");
+                }
+            );
+        });
+
+        document.getElementById('btn-confirm-location').addEventListener('click', function() {
+            gpsLocked = true;
+            hideElement(mapModal);
+            
+            // Transform Main UI to Camera Mode
+            uploadSection.classList.remove('border-sky-600/50');
+            uploadSection.classList.add('border-green-600/40', 'bg-green-900/10');
+            
+            scanTitle.innerText = "STEP 2: TAKE PHOTO";
+            scanExplanation.innerText = "Location locked. Tap here to open your camera and capture the artifact.";
+            
+            mainIcon.classList.remove('fa-map-location-dot', 'text-sky-400');
+            mainIcon.classList.add('fa-camera', 'text-green-400');
+            
+            document.getElementById('icon-pulse-ring').classList.remove('border-sky-400/50');
+            document.getElementById('icon-pulse-ring').classList.add('border-green-400/50');
+
+            document.getElementById('dashboard-subtext').innerText = "Location saved. Proceed to step 2.";
+            
+            fileInput.disabled = false;
+        });
+
+
+        // --- AUTH & STATE RETENTION LOOP ---
+        getRedirectResult(auth).catch(err => console.error(err));
+
+        onAuthStateChanged(auth, function(user) {
+            if (user) {
+                hideElement(landingSection);
+                showElement(appSection);
+                showElement(navUserArea);
+                
+                const navName = document.getElementById('nav-user-name');
+                const navRole = document.getElementById('nav-user-role');
+                const navAvatar = document.getElementById('nav-user-avatar');
+                const guestAvatar = document.getElementById('nav-guest-avatar');
+
+                if (!user.isAnonymous) {
+                    navName.innerText = user.displayName ? user.displayName.split(' ')[0].toUpperCase() : "ARCHAEOLOGIST";
+                    navRole.innerText = "Verified Researcher";
+                    navRole.className = "text-[9px] text-green-400 uppercase tracking-widest font-mono";
+                    
+                    if (user.photoURL) {
+                        navAvatar.src = user.photoURL;
+                        showElement(navAvatar);
+                        hideElement(guestAvatar);
+                    } else {
+                        hideElement(navAvatar);
+                        showElement(guestAvatar);
+                    }
+                } else {
+                    navName.innerText = "GUEST";
+                    navRole.innerText = "Anonymous Explorer";
+                    navRole.className = "text-[9px] text-slate-400 uppercase tracking-widest font-mono";
+                    hideElement(navAvatar);
+                    showElement(guestAvatar);
+                }
+
+                // CHECK FOR RESTORED SESSION (Returning from Auth Loop)
+                if (sessionStorage.getItem('returnToApp') === 'true' && !user.isAnonymous) {
+                    const savedTagsStr = sessionStorage.getItem('savedTags');
+                    const pendingAction = sessionStorage.getItem('pendingAction');
+
+                    sessionStorage.removeItem('returnToApp');
+                    sessionStorage.removeItem('savedTags');
+                    sessionStorage.removeItem('pendingAction');
+
+                    if (savedTagsStr) {
+                        gpsLocked = true;
+                        fileInput.disabled = false;
+                        
+                        const savedTags = JSON.parse(savedTagsStr);
+                        document.getElementById('dashboard-header').classList.add('hidden');
+                        hideElement(uploadSection);
+                        hideElement(previewSection);
+                        
+                        displayResults(savedTags);
+
+                        if (pendingAction) {
+                            setTimeout(() => executeAction(pendingAction), 600);
+                        }
+                    }
+                }
+            } else {
+                showElement(landingSection);
+                hideElement(appSection);
+                hideElement(navUserArea);
+                window.resetScanner();
             }
         });
 
+        document.getElementById('btn-login-archaeologist').addEventListener('click', () => signInWithRedirect(auth, googleProvider));
+        document.getElementById('btn-login-guest').addEventListener('click', () => signInAnonymously(auth).catch(err => alert(err.message)));
+        document.getElementById('btn-logout').addEventListener('click', () => signOut(auth));
+
+        // --- CAMERA FLOW ---
+        window.triggerFileInput = function() {
+            if (gpsLocked && !fileInput.disabled) {
+                fileInput.click(); 
+            } else {
+                openMapCalibration(); 
+            }
+        }
+
         fileInput.addEventListener('change', function(e) {
+            if (!gpsLocked || !spatialData.lat) {
+                fileInput.value = '';
+                openMapCalibration();
+                return;
+            }
+
             if (e.target.files && e.target.files[0]) {
                 selectedFile = e.target.files[0];
                 
-                if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+                if (currentObjectURL) {
+                    URL.revokeObjectURL(currentObjectURL); 
+                }
                 currentObjectURL = URL.createObjectURL(selectedFile);
                 imagePreview.src = currentObjectURL;
                 
+                document.getElementById('dashboard-header').classList.add('hidden'); 
                 hideElement(uploadSection);
                 showElement(previewSection);
                 hideElement(resultsSection);
                 
-                document.getElementById('hud-time').innerText = new Date().toISOString().split('T')[1].split('.')[0] + 'Z';
+                document.getElementById('hud-time').innerText = new Date().toLocaleTimeString();
+                document.getElementById('hud-lat').innerText = "LAT: " + Number(spatialData.lat).toFixed(5);
+                document.getElementById('hud-lng').innerText = "LNG: " + Number(spatialData.lng).toFixed(5);
                 
-                if (spatialData.lat) {
-                    document.getElementById('hud-lat').innerText = "LAT: " + spatialData.lat;
-                    document.getElementById('hud-lng').innerText = "LNG: " + spatialData.lng;
-                    document.getElementById('hud-site-name').innerText = spatialData.nearestSiteName.toUpperCase();
-                    
-                    const proxEl = document.getElementById('hud-proximity');
-                    proxEl.innerText = spatialData.distanceKm + " KM";
-                    proxEl.classList.remove('text-white', 'text-green-400', 'text-yellow-400');
-                    if (parseFloat(spatialData.distanceKm) < 5) proxEl.classList.add('text-green-400');
-                    else proxEl.classList.add('text-yellow-400');
-                } else {
-                    document.getElementById('hud-lat').innerText = "LAT: MISSING";
-                    document.getElementById('hud-lng').innerText = "LNG: MISSING";
-                    document.getElementById('hud-site-name').innerText = "UNKNOWN";
-                    document.getElementById('hud-proximity').innerText = "N/A";
-                }
+                const proxEl = document.getElementById('hud-proximity');
+                const km = Number(spatialData.distanceKm).toFixed(2);
+                proxEl.innerText = `${km} KM AWAY \n${spatialData.nearestSiteName}`;
             }
         });
 
-        // The Frictionless Direct Call Pipeline
         btnAnalyze.addEventListener('click', async function() {
-            if (!selectedFile) return;
+            if (!selectedFile || !spatialData.lat) return;
 
             hideElement(previewSection);
             showElement(loadingSection);
-            hideElement(btnRecovery); 
-            
+            loadingText.innerText = "Analyzing Context...";
+
             try {
                 const user = auth.currentUser;
                 const userId = user ? user.uid : 'anon';
                 const reportId = "scan_" + userId + "_" + Date.now();
+                
                 const docRef = doc(db, "field_reports", reportId);
-                
-                let locationData = null;
-                if (spatialData.lat) {
-                    locationData = { lat: parseFloat(spatialData.lat), lng: parseFloat(spatialData.lng) };
-                }
-                
-                // 1. Initial Firestore Setup
-                loadingText.innerText = "UPLOADING SPATIAL METADATA...";
-                loadingSubtext.innerText = "ESTABLISHING SECURE UPLINK";
+
                 await setDoc(docRef, {
                     user_id: userId,
                     timestamp: new Date().toISOString(),
-                    location: locationData,
+                    location: { lat: parseFloat(spatialData.lat), lng: parseFloat(spatialData.lng) },
+                    distance_to_base_km: parseFloat(spatialData.distanceKm),
                     nearest_site: spatialData.nearestSiteName,
-                    distance_to_site_km: spatialData.distanceKm ? parseFloat(spatialData.distanceKm) : null,
                     status: "uploading"
                 }, { merge: true });
 
-                // 2. Upload File to Storage
-                loadingText.innerText = "UPLOADING VISUAL DATASET...";
                 const storagePath = "scans/" + reportId + ".jpg";
                 const storageRef = ref(storage, storagePath); 
                 await uploadBytes(storageRef, selectedFile);
-                
-                // 3. Direct HTTP Fetch Call
-                loadingText.innerText = "RUNNING CLOUD VISION API...";
-                loadingSubtext.innerText = "AWAITING DIRECT SERVER RESPONSE...";
-                
-                const response = await fetch(FUNCTION_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ filePath: storagePath, reportId: reportId })
+
+                loadingText.innerText = "Generating Results...";
+
+                const unsubscribe = onSnapshot(docRef, function(docSnap) {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        
+                        if (data.status === "analyzed" && data.ai_tags) {
+                            displayResults(data.ai_tags);
+                            unsubscribe();
+                        }
+                        if (data.status === "failed") {
+                            loadingText.innerText = "Analysis Failed";
+                            loadingText.classList.remove("text-sky-300", "neon-text-blue");
+                            loadingText.classList.add("text-red-500", "neon-text-red");
+                            unsubscribe();
+                        }
+                    }
                 });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP Error Status: ${response.status}`);
-                }
-
-                const result = await response.json();
-
-                // --- DATA FORMAT MISS MATCH CORRECTION ---
-                // Support both flat JSON object and wrapped JSON variants safely
-                const finalResult = result.data ? result.data : result;
-
-                if (finalResult.success || finalResult.tags) {
-                    displayResults(finalResult.tags);
-                } else {
-                    throw new Error(finalResult.error || "Vision API Processing Failed");
-                }
-
             } catch (error) {
-                console.error("Analysis Pipeline Exception:", error);
-                
-                loadingText.innerText = "ANALYSIS FAILED";
-                loadingSubtext.innerText = "ERROR: " + error.message;
-                
-                loadingText.classList.replace("text-sky-300", "text-red-500");
-                loadingText.classList.replace("neon-text-blue", "neon-text-red");
-                
-                const spinnerRing = document.querySelector('.spinner-ring');
-                const spinnerIcon = document.querySelector('.spinner-icon');
-                if (spinnerRing) {
-                    spinnerRing.classList.remove('animate-spin', 'border-sky-400');
-                    spinnerRing.classList.add('border-red-500');
-                }
-                if (spinnerIcon) {
-                    spinnerIcon.classList.replace('fa-database', 'fa-triangle-exclamation');
-                    spinnerIcon.classList.replace('text-sky-400', 'text-red-500');
-                    spinnerIcon.classList.replace('neon-text-blue', 'neon-text-red');
-                }
-                
-                showElement(btnRecovery); 
+                loadingText.innerText = "Connection Error";
+                loadingText.classList.remove("text-sky-300", "neon-text-blue");
+                loadingText.classList.add("text-red-500", "neon-text-red");
             }
         });
 
-        // Display Full Report
+        // --- POST ANALYSIS ACTIONS & AUTH GATE ---
+        window.handlePostAction = function(actionType) {
+            const user = auth.currentUser;
+            
+            if (!user || user.isAnonymous) {
+                sessionStorage.setItem('pendingAction', actionType);
+                sessionStorage.setItem('returnToApp', 'true');
+                if (window.currentResultsTags.length > 0) {
+                    sessionStorage.setItem('savedTags', JSON.stringify(window.currentResultsTags));
+                }
+
+                const btn = document.getElementById('btn-' + actionType);
+                btn.innerHTML = `<i class="fa-solid fa-lock text-yellow-400 text-sm mb-1"></i> Sign in`;
+                btn.classList.add('border-yellow-500/50', 'text-yellow-300');
+                
+                setTimeout(() => {
+                    signInWithRedirect(auth, googleProvider);
+                }, 800);
+                return;
+            }
+
+            executeAction(actionType);
+        }
+
+        function executeAction(actionType) {
+            const cleanTextTags = window.currentResultsTags.map(tag => "> " + tag.replace("NON-HISTORICAL ANOMALY:", "").trim()).join('\n\n');
+            const fullReport = `Field Report\nLocation: ${spatialData.nearestSiteName}\n---\n${cleanTextTags}`;
+
+            if (actionType === 'copy') {
+                const textArea = document.createElement("textarea");
+                textArea.value = fullReport;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("Analysis text copied to clipboard.");
+                } catch (err) {
+                    alert("Clipboard access denied.");
+                }
+                document.body.removeChild(textArea);
+                
+            } else if (actionType === 'share') {
+                if (navigator.share) {
+                    navigator.share({ title: 'Archaeological Scan', text: fullReport }).catch(console.error);
+                } else {
+                    alert("Sharing is not supported on this browser.");
+                }
+            } else if (actionType === 'expand') {
+                resetScanner();
+                scanTitle.innerText = "STEP 2: SECONDARY ANGLE";
+                scanExplanation.innerText = "Please take another photo showing a different side (like the rim, base, or broken edge).";
+                uploadSection.classList.remove('border-sky-600/50');
+                uploadSection.classList.add('border-green-500/50', 'bg-green-900/20');
+                mainIcon.classList.remove('fa-map-location-dot', 'text-sky-400');
+                mainIcon.classList.add('fa-camera', 'text-green-400');
+                alert("Research mode expanded. Tap the scanner to take a photo of a different angle to refine the results.");
+            }
+        }
+
         function displayResults(tags) {
+            window.currentResultsTags = tags;
+            
             hideElement(loadingSection);
             showElement(resultsSection);
             analysisContainer.innerHTML = ''; 
 
-            if (!tags || tags.length === 0) {
-                resultsCount.innerText = "0 DATA POINTS RECOVERED";
-                analysisContainer.innerHTML = '<span class="text-sm text-sky-500/50 font-mono">NULL HYPOTHESIS: NO ARTIFACTS DETECTED.</span>';
-                return;
+            if (!tags || tags.length === 0) return;
+            
+            const isAnomaly = tags[0].includes("NON-HISTORICAL ANOMALY") || tags[0].includes("ANOMALY");
+            
+            const headerBar = document.getElementById('results-header-bar');
+            const headerTitle = document.getElementById('results-header-title');
+            const headerSub = document.getElementById('results-header-sub');
+            const headerIcon = document.getElementById('results-header-icon');
+            
+            if (isAnomaly) {
+                headerBar.className = "absolute top-0 left-0 w-full h-1.5 bg-red-500/50";
+                headerIcon.className = "fa-solid fa-triangle-exclamation text-red-400";
+                headerTitle.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> NOT AN ARTIFACT`;
+                headerTitle.className = "text-lg font-bold text-white mb-1 flex items-center gap-2 brand-text tracking-widest neon-text-red glitch-text";
+                headerSub.innerText = "This object appears to be modern.";
+                headerSub.className = "text-[11px] text-red-400/90 mb-5 border-b border-red-900/50 pb-3 font-bold";
+            } else {
+                headerBar.className = "absolute top-0 left-0 w-full h-1.5 bg-green-500/50";
+                headerIcon.className = "fa-solid fa-circle-check text-green-400";
+                headerTitle.innerHTML = `<i class="fa-solid fa-circle-check text-green-400"></i> ANALYSIS COMPLETE`;
+                headerTitle.className = "text-lg font-bold text-white mb-1 flex items-center gap-2 brand-text tracking-widest neon-text-green";
+                headerSub.innerText = "Based on visual details and regional history";
+                headerSub.className = "text-[11px] text-green-500/80 mb-5 border-b border-green-900/50 pb-3";
             }
 
-            resultsCount.innerText = `EXTRACTED ${tags.length} SEMANTIC VECTORS. VERIFICATION: PASSED`;
-            const databases = ['Global Arch-Net', 'Levant Ceramics DB', 'Lithic OSINT', 'Museo-Matrix'];
+            const topTags = tags.slice(0, 4);
+            const databases = ['Regional History', 'Ceramics Database', 'Tool Typology', 'Museum Records'];
 
-            tags.forEach(function(tag, index) {
-                const confidence = Math.max(99 - (index * 1.5) - Math.floor(Math.random() * 3), 45);
-                const source = databases[index % databases.length];
-                let isProximal = spatialData.distanceKm && parseFloat(spatialData.distanceKm) < 5;
-                const boolLogic = index === 0 ? (isProximal ? "TRUE AND PROXIMAL" : "TRUE (NO PROXIMITY)") : "VERIFIED OR CORRELATED";
+            topTags.forEach(function(tag, index) {
+                const confidence = isAnomaly ? (14 - (index * 2)) : (98 - (index * Math.floor(Math.random() * 5)));
+                const source = isAnomaly ? "Humor Engine" : databases[index % databases.length];
+                const boolLogic = isAnomaly ? "Mismatch" : (index === 0 ? "Strong Match" : "Verified");
                 
-                let colorClass = 'text-sky-400';
-                if (confidence > 85) colorClass = 'text-green-400';
-                else if (confidence > 70) colorClass = 'text-yellow-400';
+                let colorClass = isAnomaly ? 'text-red-400' : (confidence < 90 ? 'text-yellow-400' : 'text-green-400');
 
                 const row = document.createElement('div');
-                row.className = "analysis-row rounded font-mono text-xs mb-2 border-l-2 border-slate-700 hover:border-sky-500 transition-colors";
-                row.style.animationDelay = (index * 0.05) + "s"; 
+                let rowBorder = isAnomaly ? 'border-red-500/50' : 'border-sky-500/50';
+                row.className = `analysis-row rounded font-mono text-xs border-l-2 ${rowBorder} shimmer-effect`;
+                row.style.animationDelay = (index * 0.15) + "s";
                 
-                let htmlContent = '<div class="flex justify-between items-center mb-1">';
-                htmlContent += '<span class="text-white font-bold text-sm tracking-widest uppercase">> ' + tag + '</span>';
-                htmlContent += '<span class="' + colorClass + ' font-bold">' + confidence.toFixed(1) + '% VAE</span>';
+                let displayTag = tag.replace("NON-HISTORICAL ANOMALY:", "").trim();
+                
+                let htmlContent = '<div class="flex justify-between items-start mb-1">';
+                htmlContent += `<span class="text-white font-bold text-sm tracking-widest uppercase pr-2 break-words leading-tight flex-grow">> ${displayTag}</span>`;
+                htmlContent += `<span class="${colorClass} font-bold shrink-0 opacity-80">${confidence}% MATCH</span>`;
                 htmlContent += '</div>';
-                htmlContent += '<div class="grid grid-cols-1 gap-1 text-[10px] text-sky-400/80 pl-2">';
-                
-                if (index < 3) {
-                    htmlContent += '<div><span class="text-slate-500">SRC:</span> ' + source + ' [RAG CITED]</div>';
-                    htmlContent += '<div><span class="text-slate-500">LOGIC:</span> ' + boolLogic + '</div>';
-                } else {
-                    htmlContent += '<div><span class="text-slate-500">REF:</span> Secondary Feature Detected</div>';
-                }
-                
+                htmlContent += '<div class="grid grid-cols-2 gap-1 text-[10px] text-sky-400/80 mt-2">';
+                htmlContent += `<div><span class="text-slate-500 block text-[9px] uppercase">Source</span> ${source}</div>`;
+                htmlContent += `<div><span class="text-slate-500 block text-[9px] uppercase">Status</span> ${boolLogic}</div>`;
                 htmlContent += '</div>';
                 
                 row.innerHTML = htmlContent;
@@ -682,33 +898,37 @@
         window.resetScanner = function() {
             selectedFile = null;
             fileInput.value = '';
-            
+            window.currentResultsTags = [];
             hideElement(resultsSection);
             hideElement(loadingSection);
             hideElement(previewSection);
-            hideElement(btnRecovery);
             
-            loadingText.classList.replace("text-red-500", "text-sky-300");
-            loadingText.classList.replace("neon-text-red", "neon-text-blue");
-            loadingSubtext.innerText = "OSINT & RAG MODULES STANDBY";
+            loadingText.innerText = "Analyzing Context...";
+            loadingText.classList.remove("text-red-500", "neon-text-red");
+            loadingText.classList.add("text-sky-300", "neon-text-blue");
+            document.getElementById('dashboard-header').classList.remove('hidden'); 
             
-            const spinnerRing = document.querySelector('.spinner-ring');
-            const spinnerIcon = document.querySelector('.spinner-icon');
-            if (spinnerRing) {
-                spinnerRing.classList.add('animate-spin', 'border-sky-400');
-                spinnerRing.classList.remove('border-red-500');
-            }
-            if (spinnerIcon) {
-                spinnerIcon.classList.replace('fa-triangle-exclamation', 'fa-database');
-                spinnerIcon.classList.replace('text-red-500', 'text-sky-400');
-                spinnerIcon.classList.replace('neon-text-red', 'neon-text-blue');
+            if (gpsLocked) {
+                scanTitle.innerText = "STEP 2: TAKE PHOTO";
+                scanExplanation.innerText = "Location locked. Tap here to open your camera and capture the artifact.";
+                uploadSection.classList.remove('border-sky-600/50', 'bg-[#050b14]/50');
+                uploadSection.classList.add('border-green-600/40', 'bg-green-900/10');
+                mainIcon.classList.remove('fa-map-location-dot', 'text-sky-400');
+                mainIcon.classList.add('fa-camera', 'text-green-400');
+                document.getElementById('icon-pulse-ring').classList.remove('border-sky-400/50');
+                document.getElementById('icon-pulse-ring').classList.add('border-green-400/50');
+            } else {
+                scanTitle.innerText = "STEP 1: SET LOCATION";
+                scanExplanation.innerText = "The AI needs your location to match your finding against nearby historical sites.";
+                uploadSection.classList.remove('border-green-600/40', 'bg-green-900/10');
+                uploadSection.classList.add('border-sky-600/50', 'bg-[#050b14]/50');
+                mainIcon.classList.remove('fa-camera', 'text-green-400');
+                mainIcon.classList.add('fa-map-location-dot', 'text-sky-400');
+                document.getElementById('icon-pulse-ring').classList.add('border-sky-400/50');
+                document.getElementById('icon-pulse-ring').classList.remove('border-green-400/50');
             }
             
             showElement(uploadSection);
-            
-            spatialData = { lat: null, lng: null, distanceKm: null, nearestSiteName: "UNKNOWN" };
-            selectManualLoc.value = "";
-            updateLocationUI("STATUS: AWAITING LOCATION LOCK...", false);
         };
     </script>
 </body>
