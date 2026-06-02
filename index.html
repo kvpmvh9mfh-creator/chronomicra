@@ -400,46 +400,6 @@
         const googleProvider = new GoogleAuthProvider();
           import { getAuth } from "firebase/auth";
 
-async function analyzeArtifact(data) {
-  const auth = getAuth();
-  const user = auth.currentUser;
-
-  if (!user) {
-    throw new Error("User must be logged in to analyze artifacts.");
-  }
-
-  // 1. Get the Firebase ID Token to prove identity to the Cloud Function
-  const token = await user.getIdToken();
-
-  // 2. Your specific Cloud Run/Function URL
-  const FUNCTION_URL = "https://scan-processor-k73qbrtqaa-ue.a.run.app";
-
-  try {
-    const response = await fetch(FUNCTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${token}` // Pass the token here
-      },
-      body: JSON.stringify({
-        artifactData: data,
-        // Any other parameters your Vertex AI function needs
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`Error: ${response.statusText}`);
-    }
-
-    const result = await response.json();
-    console.log("Analysis Result:", result);
-    return result;
-
-  } catch (error) {
-    console.error("Failed to call analysis function:", error);
-  }
-}
-
 
         // UI Elements
         const landingSection = document.getElementById('landing-section');
