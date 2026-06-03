@@ -382,6 +382,7 @@
         import { getAuth, signInAnonymously, GoogleAuthProvider, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
         import { getFirestore, doc, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
 
         // Integrated Provided Configuration
         const firebaseConfig = {
@@ -398,6 +399,7 @@
         const auth = getAuth(app);
         const storage = getStorage(app);
         const db = getFirestore(app);
+        const functions = getFunctions(app);
         const googleProvider = new GoogleAuthProvider();
 
         // UI Elements
@@ -775,38 +777,6 @@
         });
 
         // --- POST ANALYSIS ACTIONS & AUTH GATE ---
-      import { getFunctions, httpsCallable } from "firebase/functions";
-
-async function executeAction(actionType) {
-    const functions = getFunctions();
-    // 'processScan' is the name of your function in index.js
-    const processScan = httpsCallable(functions, 'processScan');
-
-    try {
-        console.log(`Starting ${actionType}...`);
-        
-        // This matches the { gcsUri, contentType } expected by your backend
-        const result = await processScan({
-            gcsUri: window.currentGcsUri, // Ensure these variables exist
-            contentType: 'application/pdf',
-            action: actionType
-        });
-
-        // Firebase SDK unpacks the response for you
-        const data = result.data;
-        if (data.success) {
-            console.log("Analysis Result:", data.analysis);
-            // Update your UI here
-        } else {
-            console.error("Backend error:", data.error);
-        }
-    } catch (error) {
-        console.error("Communication error:", error.message);
-    }
-}
-
-      
-      
         window.handlePostAction = function(actionType) {
             const user = auth.currentUser;
             
@@ -830,7 +800,7 @@ async function executeAction(actionType) {
             executeAction(actionType);
         }
 
-        function executeAction(actionType) {
+        async function executeAction(actionType) {
             const cleanTextTags = window.currentResultsTags.map(tag => "> " + tag.replace("NON-HISTORICAL ANOMALY:", "").trim()).join('\n\n');
             const fullReport = `Field Report\nLocation: ${spatialData.nearestSiteName}\n---\n${cleanTextTags}`;
 
