@@ -14,7 +14,7 @@ export const analyzeArtifact = async (data) => {
   }
 
   // Your specific Google Cloud Function URL
-  const FUNCTION_URL = "https://scan-processor-k73qbrtqaa-ue.a.run.app";
+  const FUNCTION_URL = "https://scan-processor-268768133074.us-east1.run.app/";
 
   try {
     // Get fresh ID token from Firebase to verify identity
