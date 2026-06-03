@@ -10,7 +10,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
     <title>CHRONOMICRA - Advanced Field Scanner</title>
-    
+<meta http-equiv="Content-Security-Policy" content="connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://scan-processor-k73qbrtqaa-ue.a.run.app;">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -156,7 +157,9 @@
     </style>
 </head>
 <body class="cyber-grid min-h-screen flex flex-col relative pb-safe">
-
+    <!--VERTEX TO UPDATE-->
+const functions = getFunctions(app, "us-east1");
+const processScan = httpsCallable(functions, "scanProcessor");
     <!-- Navigation -->
     <nav class="w-full bg-[#050b14]/90 backdrop-blur-md border-b border-sky-900/50 sticky top-0 z-50 pt-[env(safe-area-inset-top)]">
         <div class="w-full px-4 h-16 flex items-center justify-between">
@@ -171,7 +174,7 @@
                     <p id="nav-user-role" class="text-[9px] text-sky-500 uppercase tracking-widest font-mono">Explorer</p>
                 </div>
                 <!-- Dynamic Profile Images -->
-                <img id="nav-user-avatar" src="" alt="Archaeologist Avatar" class="hidden w-9 h-9 rounded-full border border-sky-500/50 object-cover" />
+                <img id="nav-user-avatar" src="" class="hidden w-9 h-9 rounded-full border border-sky-500/50 object-cover" />
                 <div id="nav-guest-avatar" class="hidden w-9 h-9 rounded-full border border-slate-600 bg-slate-800 flex items-center justify-center">
                     <i class="fa-solid fa-user-astronaut text-slate-400 text-sm"></i>
                 </div>
@@ -184,7 +187,7 @@
     </nav>
 
     <!-- 1. LANDING PAGE -->
-    <section id="landing-section" class="hidden flex-grow flex flex-col items-center justify-center p-4 sm:p-6 animate-enter">
+    <section id="landing-section" class="flex-grow flex flex-col items-center justify-center p-4 sm:p-6 animate-enter">
         <div class="w-full max-w-md text-center space-y-6 relative">
             <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-blue-600/20 blur-[80px] -z-10 rounded-full"></div>
             
@@ -254,7 +257,7 @@
                 <div id="preview-section" class="hidden flex-col items-center w-full animate-enter">
                     <div class="scanner-container rounded-xl border border-sky-500/50 mb-4 bg-black relative flex items-center justify-center">
                         <div class="laser-line"></div>
-                        <img id="image-preview" alt="Artifact Scan Preview" class="w-full h-full object-cover opacity-60" />
+                        <img id="image-preview" class="w-full h-full object-cover opacity-60" />
                         
                         <!-- Tactical HUD Overlay -->
                         <div class="absolute inset-0 hud-overlay pointer-events-none flex flex-col justify-between p-3">
@@ -398,8 +401,6 @@
         const storage = getStorage(app);
         const db = getFirestore(app);
         const googleProvider = new GoogleAuthProvider();
-          import { getAuth } from "firebase/auth";
-
 
         // UI Elements
         const landingSection = document.getElementById('landing-section');
@@ -751,7 +752,7 @@
 
                 loadingText.innerText = "Generating Results...";
 
-                const unsubscribe = onSnapshot(docRef, (docSnap) => {
+                const unsubscribe = onSnapshot(docRef, function(docSnap) {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
                         
@@ -766,11 +767,6 @@
                             unsubscribe();
                         }
                     }
-                }, (error) => {
-                    console.error("Firestore sync error:", error);
-                    loadingText.innerText = "Sync Error";
-                    loadingText.classList.add("text-red-500");
-                    unsubscribe();
                 });
 
             } catch (error) {
@@ -809,24 +805,18 @@
             const fullReport = `Field Report\nLocation: ${spatialData.nearestSiteName}\n---\n${cleanTextTags}`;
 
             if (actionType === 'copy') {
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(fullReport).then(() => {
-                        alert("Analysis text copied to clipboard.");
-                    }).catch(() => alert("Clipboard access denied."));
-                } else {
-                    // Fallback for non-secure contexts
-                    const textArea = document.createElement("textarea");
-                    textArea.value = fullReport;
-                    document.body.appendChild(textArea);
-                    textArea.select();
-                    try {
-                        document.execCommand('copy');
-                        alert("Analysis text copied to clipboard.");
-                    } catch (err) {
-                        alert("Clipboard access denied.");
-                    }
-                    document.body.removeChild(textArea);
+                const textArea = document.createElement("textarea");
+                textArea.value = fullReport;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert("Analysis text copied to clipboard.");
+                } catch (err) {
+                    alert("Clipboard access denied.");
                 }
+                document.body.removeChild(textArea);
+                
             } else if (actionType === 'share') {
                 if (navigator.share) {
                     navigator.share({ title: 'Archaeological Scan', text: fullReport }).catch(console.error);
