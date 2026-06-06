@@ -1,0 +1,7 @@
+{
+  "name": "ChronoMicra Artifact Scanner",
+  "description": "An archaeological artifact scanner powered by Vertex AI to identify and analyze historical objects.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
